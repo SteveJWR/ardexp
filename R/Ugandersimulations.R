@@ -282,7 +282,6 @@ colnames(results) = c("ard1", "ard2", "ard3",
                       "reg1", "reg2", "reg3",
                       "HT", "DM")
 
-
 filename <- paste0("data/UganderGATE_cluster_growth",cluster.growth,
                    "mutual_benefit_", mutual.benefit,
                    "sparse_graph_",sparse.graph,
