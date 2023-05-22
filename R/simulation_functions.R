@@ -57,13 +57,18 @@ generateSBM <- function(n,P,PI,Z){
   return(list('G' = G, "groups" = A))
 }
 
-simUganderModelOutcomes <- function(G,H,A, a = 1, b = 2, delta = 1, gamma = 1, sigma = 1) {
+simUganderModelOutcomes <- function(G,H,A, a = 1, b = 2, delta = 1, gamma = 1, sigma = 1, scale.deg = F) {
   n = nrow(G)
   d.vec = as.numeric(G %*% rep(1,n))
   d.mean = mean(d.vec)
 
   eps <- rnorm(n)
-  Y0 <- (a + b*H + sigma*eps)*(d.vec/d.mean)
+  if(scale.deg){
+    Y0 <- (a + b*H + sigma*eps)*(d.vec/d.mean)
+  } else {
+    Y0 <- (a + b*H + sigma*eps)
+  }
+
   num.treated = as.numeric(G %*% A)
   f = fracTreated(G,A)
   f[is.na(f)] = 0 # no neighbors means none are treated
@@ -128,6 +133,24 @@ clusterTreatment <- function(z.vec, frac = 1/2){
   return(A)
 }
 
+saturationRandomizationTreatment <- function(c.vec, levels){
+  K = max(c.vec)
+  # c.vec must be an integer between 1 and K
+  if(length(levels) != K){
+    stop("saturation levels must be the same as the number of clusters")
+  }
+  n = length(c.vec)
+  A = rep(0,n)
+  for(i in seq(K)){
+   idx.i = which(c.vec == i)
+   ni = length(idx.i)
+   ni.treat = round(ni*levels[i])
+   idx.i.treat <- sample(idx.i, ni.treat, replace = F)
+   A[idx.i.treat] = 1
+  }
+  return(A)
+}
+
 
 
 
@@ -137,18 +160,17 @@ clusterTreatment <- function(z.vec, frac = 1/2){
 
 neighborVectors <- function(G){
   nbr.list <- list()
+  g = igraph::graph_from_adjacency_matrix(G, mode = "undirected")
   n = nrow(G)
-  for(i in seq(n)){
-    nbr.list[[i]] = which(G[i,] == 1)
-  }
-  return(nbr.list)
+  nbs <- igraph::neighborhood(g)
+  return(nbs)
 }
 
 #### Competing methods
 
 #TODO: think about where the c.vec should be denoted and where it should be z for a true clustering
 # frac is the fraction of blocks treated
-HTEstimatorCluster <- function(Y,G,A,c.vec,frac = 1/2){
+HTEstimatorCluster <- function(Y,G,A,c.vec,p.treat = 1/2){
   n = nrow(G)
   pE0 <- rep(NA, n)
   pE1 <- rep(NA, n)
@@ -156,10 +178,12 @@ HTEstimatorCluster <- function(Y,G,A,c.vec,frac = 1/2){
   IE1 <- rep(0, n)
   nbrs <- neighborVectors(G)
   K = length(unique(c.vec))
-  K.treat = round(K*frac)
+  K.treat = round(K*p.treat)
+  # rate limiting step
   neighbors <- neighborVectors(G)
 
   for(i in seq(n)){
+    #cat(paste0("Node: ", i, "/",n), end = "\r")
     neighborhood <- c(i,neighbors[[i]])
 
     if(all(A[neighborhood] == 1)){
@@ -176,7 +200,6 @@ HTEstimatorCluster <- function(Y,G,A,c.vec,frac = 1/2){
 
   out.1 <- (1/n)*Y*IE1/pE1
   out.2 <- (1/n)*Y*IE0/pE0
-
 
   not.na.idx1 <- which(!is.na(out.1))
   not.na.idx2 <- which(!is.na(out.2))
@@ -286,7 +309,7 @@ ARDSBMLinearRegressionSim <- function(Y,fmla, graphMapping, A, H, P, Z, B.boot =
   coef.list <- list()
   # almost certainly we should use a robust variance here
   var.list <- list()
-
+  data.list <- list()
   for(b in seq(B.boot)){
     if (verbose) {
       m1 = (round(20 * b/B.boot))
@@ -303,16 +326,10 @@ ARDSBMLinearRegressionSim <- function(Y,fmla, graphMapping, A, H, P, Z, B.boot =
     model.sim <- lm(fmla, data = data)
     coef.list[[b]] <- model.sim$coefficients
     var.list[[b]] <- sandwich::sandwich(model.sim)
+    data.list[[b]] <- data
   }
-  return(list("coef" = coef.list, "var" = var.list))
+  return(list("coef" = coef.list, "var" = var.list, "data" = data.list))
 }
-
-
-
-
-
-
-
 
 
 

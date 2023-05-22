@@ -84,7 +84,13 @@ estimatePmat <- function(Z.hat, G){
         idx.2 = which(Z.hat == j)
         if(i == j){
           G.sub = G[idx.1, idx.2]
-          p.hat = mean(Matrix::triu(G.sub))
+          if(length(G.sub) == 1){
+            p.hat = 0
+          } else {
+            n.sub <- nrow(G.sub)
+            p.hat = sum(triu(G.sub))/choose(n.sub,2) # since it keeps the lower part.
+          }
+
           P[i,j] = p.hat
         } else {
           G.sub = G[idx.1, idx.2]

@@ -2,7 +2,7 @@
 
 ## Simuations to compare the performance against both full data and Ugander Methods
 
-# rm(list = ls())
+rm(list = ls())
 source("R/ardexp.R") # functions for the main
 source("R/simulation_functions.R") # has the additional simulations pieces
 
@@ -18,9 +18,6 @@ if(slurm_arrayid == ""){
   id <- as.numeric(slurm_arrayid)
 }
 
-mutual.benefit
-cluster.growth
-sparse.graph
 
 if(id %% 8 == 1){
   mutual.benefit = T
@@ -68,15 +65,14 @@ block = ceiling(id/8)
 
 # True model parameters
 a = 1
-b = 1
+b = -1
 delta = 1
 
 # simulation noise
-sigma = 0.5# how much noise are we willing to permit here?
+sigma = 0.5 # how much noise are we willing to permit here?
 
 
-# TODO: make this a function of the arrays
-mutual.benefit = T
+
 if(mutual.benefit){
   gamma = 1
 } else {
@@ -98,18 +94,15 @@ J = length(n.seq) # number of sample sizes to look at
 # treatment probability
 p.treat = 0.5
 
-#TODO: make this a function of the array id
-cluster.growth = F
+
 if(cluster.growth){
-  K.seq = rep(10,J)
-} else {
   K.seq = round(n.seq/10) # linear growth in number of clusters
+} else {
+  K.seq = rep(10,J)
 }
 
 
 
-#TODO: make this a function of the array id
-sparse.graph = F
 if(sparse.graph) {
   p.in.seq = rep(0.2*100/n.seq, J)
   p.out.seq = rep(0.02*100/n.seq, J)
@@ -128,28 +121,38 @@ binomial.randomization <- F
 
 
 # we decouple the design piece and only talk about inference.
-n.methods = 8 #three full data regressions, three ard regressions 1 Difference in means and 1 HT
+n.methods = 11 #three full data regressions, three ard regressions 1, three ard regressions simulating from the true model Difference in means and 1 HT
 
 results <- array(NA, c(n.sims, n.methods, J))
 
+# Methods tuning parameters
+B.boot = 200
 #### Simulations Start
 
 # formula for the regression model
 fmla <- formula(Y ~ 0 + deg.ratio +  deg.ratio:(H + A + H:A + frac.treated + H:frac.treated))
+#fmla <- formula(Y ~ (H + A + H:A + frac.treated + H:frac.treated))
+
+# SaturationRandomization Design.
+sat.frac = 1/2
+p.high.level = 0.8
+p.low.level = 0.2
+
 
 for(j in seq(J)){
   for(sim in seq(n.sims)){
+    cat(paste0("Sim: ", sim, "/", n.sims, " --- Sample Size: ", j,"/", J), end = "\r")
     n = n.seq[j]
     K = K.seq[j]
 
     P = matrix(data = 0, nrow = K, ncol = K)
 
     p.in.max = p.in.seq[j]
-    p.in.min = p.in.max/2
+    p.in.min = p.in.max #p.in.max/2 TODO: put this back
 
 
     p.out.max = p.out.seq[j]
-    p.out.min = p.out.max/2
+    p.out.min = p.out.max #p.out.max/2 TODO: put this back
 
 
     P[upper.tri(P)] = seq(p.out.min,p.out.max, length.out = choose(K,2))
@@ -172,25 +175,25 @@ for(j in seq(J)){
 
 
     # whether to do binomial randomization or the true cluster treatment
-    if(binomial.randomization){
-      A <- binomialTreatment(n,p.treat)
-    } else {
-      A <- clusterTreatment(Z.true, p.treat)
-      if(include.estimated.randomization){
-        A.est  <- clusterTreatment(Z.est, p.treat)
-      }
-    }
+    A.clust <- clusterTreatment(Z.true, p.treat)
 
 
-    Y <- simUganderModelOutcomes(G.true,H,A,a = a, b = b, delta = delta, gamma = gamma, sigma = sigma)
 
+    K.high.level <- round(sat.frac*K)
+    K.low.level <- K - K.high.level
+    clust.levels <- c(rep(p.high.level, K.high.level), rep(p.low.level, K.low.level))
+    A.sat <- saturationRandomizationTreatment(Z.true, levels = clust.levels)
+
+
+    Y.clust <- simUganderModelOutcomes(G.true,H,A.clust,a = a, b = b, delta = delta, gamma = gamma, sigma = sigma, scale.deg = T)
+    Y.sat <- simUganderModelOutcomes(G.true,H,A.sat,a = a, b = b, delta = delta, gamma = gamma, sigma = sigma, scale.deg = T)
 
 
     d.vec = as.numeric(G.true %*% rep(1,n))
     d.mean = mean(d.vec)
-    f <- fracTreated(G.true,A)
-    data <- UganderCovariates(G,H,A)
-    data <- data.frame("Y" = Y, "A" = A, "frac.treated" = f, "H" = H, "deg.ratio" = d.vec/d.mean)
+    f <- fracTreated(G.true,A.sat)
+    data <- UganderCovariates(G.true,H,A.sat)
+    data <- data.frame("Y" = Y.sat, "A" = A.sat, "frac.treated" = f, "H" = H, "deg.ratio" = d.vec/d.mean)
 
 
 
@@ -198,21 +201,22 @@ for(j in seq(J)){
 
 
     # full data version.
-    gate.est1 <- model$coefficients[3]/model$coefficients[1] + model$coefficients[4]/model$coefficients[2]
-    gate.est2 <- model$coefficients[5]/model$coefficients[1] + model$coefficients[6]/model$coefficients[2]
+    # (Note I had e)
+    gate.est1 <- model$coefficients[3]/model$coefficients[1] + model$coefficients[4]/model$coefficients[1]
+    gate.est2 <- model$coefficients[5]/model$coefficients[2] + model$coefficients[6]/model$coefficients[2]
     gate.est3 <- (gate.est1 + gate.est2)/2
 
-
+    gate.est1
+    gate.est2
+    gate.est3
 
     # Here we are asking about the traits directly for simplicity in the simulations.
-    #
+
     traits <- g.true$groups
 
     X <-computeARD(traits, G.true)
 
-
     # Assuming For simplicity, K is known.
-
     k.means.model <- clusterARDKmeans(X,K)
 
 
@@ -223,32 +227,58 @@ for(j in seq(J)){
 
     P.hat <- estimatePmat(Z.hat, G.true)
 
-    res.ard <- ARDSBMLinearRegressionSim(Y, fmla, UganderCovariates, A, H, P.hat,Z.hat, B.boot = 200, verbose = T)
 
+    res.ard <- ARDSBMLinearRegressionSim(Y.sat, fmla, UganderCovariates, A.sat, H, P.hat,Z.hat, B.boot = B.boot, verbose = T)
 
     ard.avg.coef <- meanOverList(res.ard$coef)
+    ard.avg.data <- meanOverList(res.ard$data)
 
-
-
-    ard.gate.est1 <- ard.avg.coef[3]/ard.avg.coef[1] + ard.avg.coef[4]/ard.avg.coef[2]
-    ard.gate.est2 <- ard.avg.coef[5]/ard.avg.coef[1] + ard.avg.coef[6]/ard.avg.coef[2]
+    ard.gate.est1 <- ard.avg.coef[3]/ard.avg.coef[1] + ard.avg.coef[4]/ard.avg.coef[1]
+    ard.gate.est2 <- ard.avg.coef[5]/ard.avg.coef[2] + ard.avg.coef[6]/ard.avg.coef[2]
     ard.gate.est3 <- (ard.gate.est1 + ard.gate.est2)/2
 
+    ard.gate.est1
+    ard.gate.est2
+    ard.gate.est3
 
-    gate.HT <- HTEstimatorCluster(Y,G.true,A,c.vec = Z.true,frac = p.treat)
+    res.ard.true.model <- ARDSBMLinearRegressionSim(Y.sat, fmla, UganderCovariates, A.sat, H, P,Z.true, B.boot = B.boot, verbose = T)
 
-    gate.DM <- diffMeansEstimator(Y,A)
 
-    res.vec <- c(ard.gate.est1, ard.gate.est2, ard.gate.est3,
-                 gate.est1, gate.est2, gate.est3,
-                 gate.HT, gate.DM)
+    ard.true.model.avg.coef <- meanOverList(res.ard.true.model$coef)
 
+    ard.true.model.data <- meanOverList(res.ard.true.model$data)
+    ard.true.model.gate.est1 <- ard.true.model.avg.coef[3]/ard.true.model.avg.coef[1] + ard.true.model.avg.coef[4]/ard.true.model.avg.coef[1]
+    ard.true.model.gate.est2 <- ard.true.model.avg.coef[5]/ard.true.model.avg.coef[2] + ard.true.model.avg.coef[6]/ard.true.model.avg.coef[2]
+    ard.true.model.gate.est3 <- (ard.true.model.gate.est1 + ard.true.model.gate.est2)/2
+
+    ard.true.model.gate.est1
+    ard.true.model.gate.est2
+    ard.true.model.gate.est3
+
+    #data.mean.sub <- data
+    #data.mean.sub$frac.treated <- 0.2630463*(data.mean.sub$frac.treated < 0.5) + 0.7369646*(data.mean.sub$frac.treated > 0.5)
+    #cor(data.mean.sub)
+    #model.mean.sub <- lm(fmla, data.mean.sub)
+
+    #model.mean.sub$coefficients
+    #TODO: make the HT estimator even better
+    gate.HT <- HTEstimatorCluster(Y.clust,G.true,A.clust,c.vec = Z.true,p.treat = p.treat)
+
+
+    gate.DM <- diffMeansEstimator(Y.clust,A.clust)
+    res.vec <- c(ard.gate.est1 - gate, ard.gate.est2 - gate, ard.gate.est3 - gate,
+                 ard.true.model.gate.est1 - gate, ard.true.model.gate.est2 - gate,
+                 ard.true.model.gate.est3 - gate,
+                 gate.est1 - gate, gate.est2 - gate, gate.est3 - gate,
+                 gate.HT - gate, gate.DM - gate)
+    names(res.vec) = NULL
     results[sim,,j] <- res.vec
   }
 }
 
 
 colnames(results) = c("ard1", "ard2", "ard3",
+                      "ard.tm1", "ard.tm2", "ard.tm3",
                       "reg1", "reg2", "reg3",
                       "HT", "DM")
 
@@ -259,7 +289,6 @@ filename <- paste0("data/UganderGATE_cluster_growth",cluster.growth,
                    "block",block,".rds")
 
 saveRDS(results, filename)
-
 
 
 
