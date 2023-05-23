@@ -89,6 +89,7 @@ gate = gamma + delta
 n.sims =  10#
 
 n.seq <- c(100,316,1000,3162,10000) # log scale population growth.
+n.seq <- c(100,316,1000,3162) #TODO: Do this with the larger sample size.
 J = length(n.seq) # number of sample sizes to look at
 
 # treatment probability for graph cluster designs
