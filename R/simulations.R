@@ -89,7 +89,7 @@ gate = gamma + delta
 n.sims =  10#
 
 n.seq <- c(100,316,1000,3162,10000) # log scale population growth.
-n.seq <- c(100,316,1000,3162) #TODO: Do this with the larger sample size.
+#n.seq <- c(100,316,1000,3162) #TODO: Do this with the larger sample size.
 J = length(n.seq) # number of sample sizes to look at
 
 # treatment probability for graph cluster designs
@@ -97,7 +97,7 @@ p.treat = 0.5
 
 
 if(cluster.growth){
-  K.seq = round(n.seq/10) # linear growth in number of clusters
+  K.seq = round((n.seq)**(1/2)) # square root growth in number of clusters
 } else {
   K.seq = rep(10,J)
 }
@@ -127,7 +127,7 @@ n.methods = 11 #three full data regressions, three ard regressions 1, three ard 
 results <- array(NA, c(n.sims, n.methods, J))
 
 # Methods tuning parameters
-B.boot = 200
+B.boot = 50
 #### Simulations Start
 
 # formula for the regression model
@@ -135,9 +135,9 @@ fmla <- formula(Y ~ 0 + deg.ratio +  deg.ratio:(H + A + H:A + frac.treated + H:f
 #fmla <- formula(Y ~ (H + A + H:A + frac.treated + H:frac.treated))
 
 # SaturationRandomization Design.
-sat.frac = 1/2
-p.high.level = 0.8
-p.low.level = 0.2
+sat.frac = 1/2 #treat half of the clusters at 0.9 and the other half at 0.1
+p.high.level = 0.9
+p.low.level = 0.1
 
 
 for(j in seq(J)){
@@ -292,6 +292,89 @@ saveRDS(results, filename)
 
 
 
+
+make.plots = F
+if(make.plots){
+  library(ggpubr)
+  library(abind)
+  png.width = 1200
+  png.height = 1000
+  png.res = 200
+
+  mutual.benefit = F
+  cluster.growth = F
+  sparse.graph = T
+
+  filename <- paste0("data/UganderGATE_cluster_growth",cluster.growth,
+                     "mutual_benefit_", mutual.benefit,
+                     "sparse_graph_",sparse.graph,
+                     "block",1,".rds")
+  results = readRDS(filename)
+  for(i in seq(2,100)){
+    filename <- paste0("data/UganderGATE_cluster_growth",cluster.growth,
+                       "mutual_benefit_", mutual.benefit,
+                       "sparse_graph_",sparse.graph,
+                       "block",i,".rds")
+    res.tmp <-readRDS(filename)
+    results <- abind(results, res.tmp, along = 1)
+  }
+  n.sims = dim(results)[1]
+
+  methods <- c("ard1", "ard2", "ard3",
+               "ard.tm1", "ard.tm2", "ard.tm3",
+               "reg1", "reg2", "reg3",
+               "HT", "DM")
+
+  J = length(methods)
+  n.seq <- c(100,316,1000,3162)
+  sample.size.vec <- rep(n.seq, each = J)
+  N = length(n.seq)
+
+  bias.vec = c()
+  rmse.vec = c()
+  for(j in seq(N)){
+
+    res.tmp = as.matrix(results[,,j])
+    bias.vec = c(bias.vec, colMeans(res.tmp, na.rm = T))
+    rmse.vec = c(rmse.vec, colMeans(abs(res.tmp), na.rm = T)) # change to the mean absolute deviation
+  }
+  #rmse.vec <- sqrt(rmse.vec)
+
+  res.data <- data.frame("SampleSize" = sample.size.vec,
+                         "Method" = methods,
+                         "Bias" = bias.vec,
+                         "RMSE" = rmse.vec)
+  method.subset =  c("ard1", "ard2", "ard3","reg1", "reg2", "reg3", "DM", "HT")
+  res.data <- res.data[res.data$Method %in% method.subset, ]
+
+  plt.bias <- ggplot(res.data, aes(x = log(SampleSize), y = Bias, group = Method,color = Method)) +
+    geom_line() +
+    #geom_point() +
+    #geom_errorbar(aes(ymin = ModelDev - 2*ModelDev_sd, ymax = ModelDev + 2*ModelDev_sd)) +
+    ggtitle("Bias of Methods") +
+    xlab("log-Sample Size") +
+    ylab("Bias")
+  #geom_errorbar(aes(ymin = lik.mean.scaled - 2*lik.sd.scaled, ymax = lik.mean.scaled + 2*lik.sd.scaled))
+
+  plt.bias
+
+  plt.rmse <- ggplot(res.data, aes(x = log(SampleSize), y = RMSE, group = Method,color = Method)) +
+    geom_line() +
+    #geom_point() +
+    #geom_errorbar(aes(ymin = ModelDev - 2*ModelDev_sd, ymax = ModelDev + 2*ModelDev_sd)) +
+    ggtitle("Bias of Methods") +
+    xlab("log-Sample Size") +
+    ylab("RMSE") +
+    coord_cartesian(
+      xlim =c(min(log(sample.size.vec)),max(log(sample.size.vec))),
+      ylim = c(0,10)
+    )
+
+  #geom_errorbar(aes(ymin = lik.mean.scaled - 2*lik.sd.scaled, ymax = lik.mean.scaled + 2*lik.sd.scaled))
+
+  plt.rmse
+
+}
 
 
 
