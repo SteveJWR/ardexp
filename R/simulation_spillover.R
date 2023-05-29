@@ -99,7 +99,7 @@ p.treat = 0.5
 
 
 if(cluster.growth){
-  K.seq = round((n.seq)**(1/2)) # square root growth in number of clusters
+  K.seq = round((n.seq)**(1/3)) # square root growth in number of clusters
 } else {
   K.seq = rep(10,J)
 }
@@ -160,7 +160,7 @@ for(j in seq(J)){
     if(cluster.equal.size){
       PI = rep(1/K,K)
     } else {
-      PI = seq(1,sqrt(K),K)
+      PI = seq(1,sqrt(K),length.out = K)
       PI = PI/sum(PI)
     }
 

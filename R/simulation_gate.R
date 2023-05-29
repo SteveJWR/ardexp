@@ -158,7 +158,7 @@ for(j in seq(J)){
     if(cluster.equal.size){
       PI = rep(1/K,K)
     } else {
-      PI = seq(1,sqrt(K),K)
+      PI = seq(1,sqrt(K),length.out = K)
       PI = PI/sum(PI)
     }
 
@@ -298,7 +298,7 @@ saveRDS(results, filename)
 
 
 
-make.plots = F
+make.plots = T
 if(make.plots){
   library(ggpubr)
   library(abind)
@@ -306,7 +306,9 @@ if(make.plots){
   png.height = 1000
   png.res = 200
 
-
+  cluster.growth = F
+  mutual.benefit = F
+  cluster.equal.size = F
 
   filename <- paste0("data/UganderGATE_cluster_growth",cluster.growth,
                      "mutual_benefit_", mutual.benefit,
@@ -323,9 +325,9 @@ if(make.plots){
   }
   n.sims = dim(results)[1]
 
-  methods <- c("ard1", "ard2", "ard3",
-               "ard.tm1", "ard.tm2", "ard.tm3",
-               "reg1", "reg2", "reg3",
+  methods <- c("ard",
+               "ard.tm",
+               "reg",
                "HT", "DM")
 
   J = length(methods)
@@ -347,7 +349,10 @@ if(make.plots){
                          "Method" = methods,
                          "Bias" = bias.vec,
                          "RMSE" = rmse.vec)
-  method.subset =  c("ard1", "ard2", "ard3","reg1", "reg2", "reg3", "DM", "HT")
+  method.subset = c("ard",
+                    "ard.tm",
+                    "reg",
+                    "HT", "DM")
   res.data <- res.data[res.data$Method %in% method.subset, ]
 
   plt.bias <- ggplot(res.data, aes(x = log(SampleSize), y = Bias, group = Method,color = Method)) +
