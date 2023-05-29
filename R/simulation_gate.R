@@ -298,7 +298,7 @@ saveRDS(results, filename)
 
 
 
-make.plots = T
+make.plots = F
 if(make.plots){
   library(ggpubr)
   library(abind)
@@ -308,7 +308,7 @@ if(make.plots){
 
   cluster.growth = F
   mutual.benefit = F
-  cluster.equal.size = F
+  cluster.equal.size = T
 
   filename <- paste0("data/UganderGATE_cluster_growth",cluster.growth,
                      "mutual_benefit_", mutual.benefit,
@@ -331,7 +331,7 @@ if(make.plots){
                "HT", "DM")
 
   J = length(methods)
-  n.seq <- c(100,316,1000,3162)
+  n.seq <- c(100,316,1000,3162,10000)
   sample.size.vec <- rep(n.seq, each = J)
   N = length(n.seq)
 
@@ -341,9 +341,9 @@ if(make.plots){
 
     res.tmp = as.matrix(results[,,j])
     bias.vec = c(bias.vec, colMeans(res.tmp, na.rm = T))
-    rmse.vec = c(rmse.vec, colMeans(abs(res.tmp), na.rm = T)) # change to the mean absolute deviation
+    rmse.vec = c(rmse.vec, colMeans(abs(res.tmp)^2, na.rm = T)) # change to the mean absolute deviation
   }
-  #rmse.vec <- sqrt(rmse.vec)
+  rmse.vec <- sqrt(rmse.vec)
 
   res.data <- data.frame("SampleSize" = sample.size.vec,
                          "Method" = methods,
@@ -372,12 +372,12 @@ if(make.plots){
     #geom_errorbar(aes(ymin = ModelDev - 2*ModelDev_sd, ymax = ModelDev + 2*ModelDev_sd)) +
     ggtitle("Mean Absolute Deviation of Methods") +
     xlab("log-Sample Size") +
-    ylab("MAD") +
+    ylab("RMSE") +
     coord_cartesian(
       xlim =c(min(log(sample.size.vec)),max(log(sample.size.vec))),
       ylim = c(0,10)
     )
-
+  plt.rmse
   #geom_errorbar(aes(ymin = lik.mean.scaled - 2*lik.sd.scaled, ymax = lik.mean.scaled + 2*lik.sd.scaled))
 
   #plt.rmse

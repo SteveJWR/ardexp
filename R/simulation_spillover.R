@@ -256,7 +256,7 @@ colnames(results) = c("ard",
                       "ard.tm",
                       "reg")
 
-filename <- paste0("data/SpilloverGATE_cluster_growth",cluster.growth,
+filename <- paste0("data/Spillover_cluster_growth",cluster.growth,
                    "mutual_benefit_", mutual.benefit,
                    "cluster_equal_",cluster.equal.size,
                    "block",block,".rds")
@@ -274,15 +274,17 @@ if(make.plots){
   png.height = 1000
   png.res = 200
 
+  cluster.growth = F
+  mutual.benefit = F
+  cluster.equal.size = T
 
-
-  filename <- paste0("data/SpilloverGATE_cluster_growth",cluster.growth,
+  filename <- paste0("data/Spillover_cluster_growth",cluster.growth,
                      "mutual_benefit_", mutual.benefit,
                      "cluster_equal_",cluster.equal.size,
                      "block",1,".rds")
   results = readRDS(filename)
   for(i in seq(2,100)){
-    filename <- paste0("data/SpilloverGATE_cluster_growth",cluster.growth,
+    filename <- paste0("data/Spillover_cluster_growth",cluster.growth,
                        "mutual_benefit_", mutual.benefit,
                        "cluster_equal_",cluster.equal.size,
                        "block",i,".rds")
@@ -291,13 +293,12 @@ if(make.plots){
   }
   n.sims = dim(results)[1]
 
-  methods <- c("ard1", "ard2", "ard3",
-               "ard.tm1", "ard.tm2", "ard.tm3",
-               "reg1", "reg2", "reg3",
-               "HT", "DM")
+  methods <- c("ard",
+               "ard.tm",
+               "reg")
 
   J = length(methods)
-  n.seq <- c(100,316,1000,3162)
+  n.seq <- c(100,316,1000,3162, 10000)
   sample.size.vec <- rep(n.seq, each = J)
   N = length(n.seq)
 
@@ -307,22 +308,24 @@ if(make.plots){
 
     res.tmp = as.matrix(results[,,j])
     bias.vec = c(bias.vec, colMeans(res.tmp, na.rm = T))
-    rmse.vec = c(rmse.vec, colMeans(abs(res.tmp), na.rm = T)) # change to the mean absolute deviation
+    rmse.vec = c(rmse.vec, colMeans(abs(res.tmp)^2, na.rm = T)) # change to the mean absolute deviation
   }
-  #rmse.vec <- sqrt(rmse.vec)
+  rmse.vec <- sqrt(rmse.vec)
 
   res.data <- data.frame("SampleSize" = sample.size.vec,
                          "Method" = methods,
                          "Bias" = bias.vec,
                          "RMSE" = rmse.vec)
-  method.subset =  c("ard1", "ard2", "ard3","reg1", "reg2", "reg3", "DM", "HT")
+  method.subset =  c("ard",
+                     "ard.tm",
+                     "reg")
   res.data <- res.data[res.data$Method %in% method.subset, ]
 
   plt.bias <- ggplot(res.data, aes(x = log(SampleSize), y = Bias, group = Method,color = Method)) +
     geom_line() +
     #geom_point() +
     #geom_errorbar(aes(ymin = ModelDev - 2*ModelDev_sd, ymax = ModelDev + 2*ModelDev_sd)) +
-    ggtitle("Bias of Methods") +
+    ggtitle("RMSE of Methods") +
     xlab("log-Sample Size") +
     ylab("Bias")
   #geom_errorbar(aes(ymin = lik.mean.scaled - 2*lik.sd.scaled, ymax = lik.mean.scaled + 2*lik.sd.scaled))
@@ -333,21 +336,21 @@ if(make.plots){
     geom_line() +
     #geom_point() +
     #geom_errorbar(aes(ymin = ModelDev - 2*ModelDev_sd, ymax = ModelDev + 2*ModelDev_sd)) +
-    ggtitle("Mean Absolute Deviation of Methods") +
+    ggtitle("RMSE of Methods") +
     xlab("log-Sample Size") +
-    ylab("MAD") +
+    ylab("RMSE") +
     coord_cartesian(
       xlim =c(min(log(sample.size.vec)),max(log(sample.size.vec))),
-      ylim = c(0,10)
+      ylim = c(0,1)
     )
-
+  plt.rmse
   #geom_errorbar(aes(ymin = lik.mean.scaled - 2*lik.sd.scaled, ymax = lik.mean.scaled + 2*lik.sd.scaled))
 
   #plt.rmse
-  file.bias <- paste0("plot/Bias_SpilloverGATE_cluster_growth",cluster.growth,
+  file.bias <- paste0("plot/Bias_Spillover_cluster_growth",cluster.growth,
                       "mutual_benefit_", mutual.benefit,
                       "cluster_equal_",cluster.equal.size,".png")
-  file.rmse <- paste0("plot/RMSE_SpilloverGATE_cluster_growth",cluster.growth,
+  file.rmse <- paste0("plot/RMSE_Spillover_cluster_growth",cluster.growth,
                       "mutual_benefit_", mutual.benefit,
                       "cluster_equal_",cluster.equal.size,".png")
 
