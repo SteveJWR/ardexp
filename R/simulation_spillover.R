@@ -1,6 +1,6 @@
 
 
-## Simuations to compare the performance against both full data and Ugander Methods
+## Simuations to compare the full data and spillover parameters
 
 rm(list = ls())
 source("R/ardexp.R") # functions for the main
@@ -12,7 +12,7 @@ source("R/simulation_functions.R") # has the additional simulations pieces
 slurm_arrayid <- Sys.getenv('SLURM_ARRAY_TASK_ID')
 print(Sys.getenv('SLURM_ARRAY_TASK_ID'))
 if(slurm_arrayid == ""){
-  id = 1
+  id = 2
 } else {
   # coerce the value to an integer
   id <- as.numeric(slurm_arrayid)
@@ -22,42 +22,42 @@ if(slurm_arrayid == ""){
 if(id %% 8 == 1){
   mutual.benefit = T
   cluster.growth = T
-  sparse.graph = T
+  cluster.equal.size = T
 
 } else if(id %% 8 == 2) {
   mutual.benefit = F
   cluster.growth = T
-  sparse.graph = T
+  cluster.equal.size = T
 
 } else if(id %% 8 == 3) {
   mutual.benefit = T
   cluster.growth = F
-  sparse.graph = T
+  cluster.equal.size = T
 
 } else if(id %% 8 == 4) {
   mutual.benefit = F
   cluster.growth = F
-  sparse.graph = T
+  cluster.equal.size = T
 
 } else if(id %% 8 == 5) {
   mutual.benefit = T
   cluster.growth = T
-  sparse.graph = F
+  cluster.equal.size = F
 
 } else if(id %% 8 == 6) {
   mutual.benefit = F
   cluster.growth = T
-  sparse.graph = F
+  cluster.equal.size = F
 
 } else if(id %% 8 == 7) {
   mutual.benefit = T
   cluster.growth = F
-  sparse.graph = F
+  cluster.equal.size = F
 
 } else if(id %% 8 == 0) {
   mutual.benefit = F
   cluster.growth = F
-  sparse.graph = F
+  cluster.equal.size = F
 
 }
 
@@ -65,7 +65,7 @@ block = ceiling(id/8)
 
 # True model parameters
 a = 1
-b = -1
+b = 0 # no degree adjustment
 delta = 1
 
 # simulation noise
@@ -74,9 +74,11 @@ sigma = 0.5 # how much noise are we willing to permit here?
 
 
 if(mutual.benefit){
-  gamma = 1
+  gamma0 = 1
+  gamma1 = 0.2
 } else {
-  gamma = -1
+  gamma0 = -1
+  gamma1 = -0.2
 }
 
 
@@ -84,7 +86,7 @@ if(mutual.benefit){
 # but that wears off if everyone else around you has it
 
 #Global average treatment effect
-gate = gamma + delta
+theta = gamma1 - gamma0
 
 n.sims =  10#
 
@@ -104,17 +106,11 @@ if(cluster.growth){
 
 
 
-if(sparse.graph) {
-  p.in.seq = rep(0.2*100/n.seq, J)
-  p.out.seq = rep(0.02*100/n.seq, J)
-} else {
-  p.in.seq = rep(0.2, J)
-  p.out.seq = rep(0.02, J)
-}
 
+p.in.seq = rep(0.2, J)
+p.out.seq = rep(0.02, J)
 
 # other simulation parameters
-equal.size.clusters <- T
 binomial.randomization <- F
 
 # In order to have some degree heterogeneity, we say that the clusters have an
@@ -122,8 +118,7 @@ binomial.randomization <- F
 
 
 # we decouple the design piece and only talk about inference.
-n.methods = 11 #three full data regressions, three ard regressions 1, three ard regressions simulating from the true model Difference in means and 1 HT
-
+n.methods = 3
 results <- array(NA, c(n.sims, n.methods, J))
 
 # Methods tuning parameters
@@ -131,8 +126,9 @@ B.boot = 50
 #### Simulations Start
 
 # formula for the regression model
-fmla <- formula(Y ~ 0 + deg.ratio +  deg.ratio:(H + A + H:A + frac.treated + H:frac.treated))
+fmla <- formula(Y ~ A*frac.treated )
 #fmla <- formula(Y ~ (H + A + H:A + frac.treated + H:frac.treated))
+
 
 # SaturationRandomization Design.
 sat.frac = 1/2 #treat half of the clusters at 0.9 and the other half at 0.1
@@ -161,19 +157,19 @@ for(j in seq(J)){
     diag(P) = seq(p.in.min,p.in.max, length.out = K)
 
 
-    if(equal.size.clusters){
+    if(cluster.equal.size){
       PI = rep(1/K,K)
     } else {
-      PI = seq(1,K,K)
-      PI = PI/K
+      PI = seq(1,sqrt(K),K)
+      PI = PI/sum(PI)
     }
 
     g.true <- generateSBM(n,P,PI)
     G.true <- g.true$G
     Z.true = g.true$groups
 
-    H <- simH(Z.true)
-
+    #H <- simH(Z.true)
+    H = rep(NA,n)
 
     # whether to do binomial randomization or the true cluster treatment
     A.clust <- clusterTreatment(Z.true, p.treat)
@@ -186,30 +182,27 @@ for(j in seq(J)){
     A.sat <- saturationRandomizationTreatment(Z.true, levels = clust.levels)
 
 
-    Y.clust <- simUganderModelOutcomes(G.true,H,A.clust,a = a, b = b, delta = delta, gamma = gamma, sigma = sigma, scale.deg = T)
-    Y.sat <- simUganderModelOutcomes(G.true,H,A.sat,a = a, b = b, delta = delta, gamma = gamma, sigma = sigma, scale.deg = T)
+    outcome.clust <- simSpilloverModelOutcomes(G.true,A.clust,a = a, b = b, delta = delta, gamma0 = gamma0, gamma1 = gamma1, sigma = sigma)
+    outcome.sat <- simSpilloverModelOutcomes(G.true,A.sat,a = a, b = b, delta = delta, gamma0 = gamma0, gamma1 = gamma1, sigma = sigma)
+    Y.clust <- outcome.clust$Y
+    Y.sat <- outcome.sat$Y
 
 
     d.vec = as.numeric(G.true %*% rep(1,n))
     d.mean = mean(d.vec)
     f <- fracTreated(G.true,A.sat)
-    data <- UganderCovariates(G.true,H,A.sat)
-    data <- data.frame("Y" = Y.sat, "A" = A.sat, "frac.treated" = f, "H" = H, "deg.ratio" = d.vec/d.mean)
-
+    data <- SpilloverCovariates(G.true,A.sat)
+    data <- data.frame("Y" = Y.sat, "A" = A.sat, "frac.treated" = f, "deg.ratio" = d.vec/d.mean)
 
 
     model <- lm(fmla, data = data)
 
 
+
     # full data version.
     # (Note I had e)
-    gate.est1 <- model$coefficients[3]/model$coefficients[1] + model$coefficients[4]/model$coefficients[1]
-    gate.est2 <- model$coefficients[5]/model$coefficients[2] + model$coefficients[6]/model$coefficients[2]
-    gate.est3 <- (gate.est1 + gate.est2)/2
+    theta.est <- model$coefficients[4]
 
-    gate.est1
-    gate.est2
-    gate.est3
 
     # Here we are asking about the traits directly for simplicity in the simulations.
 
@@ -229,32 +222,18 @@ for(j in seq(J)){
     P.hat <- estimatePmat(Z.hat, G.true)
 
 
-    res.ard <- ARDSBMLinearRegressionSim(Y.sat, fmla, UganderCovariates, A.sat, H, P.hat,Z.hat, B.boot = B.boot, verbose = T)
+    res.ard <- ARDSBMSpilloverLinearRegressionSim(Y.sat, fmla, SpilloverCovariates, A.sat, P.hat,Z.hat, B.boot = B.boot, verbose = T)
 
     ard.avg.coef <- meanOverList(res.ard$coef)
     ard.avg.data <- meanOverList(res.ard$data)
 
-    ard.gate.est1 <- ard.avg.coef[3]/ard.avg.coef[1] + ard.avg.coef[4]/ard.avg.coef[1]
-    ard.gate.est2 <- ard.avg.coef[5]/ard.avg.coef[2] + ard.avg.coef[6]/ard.avg.coef[2]
-    ard.gate.est3 <- (ard.gate.est1 + ard.gate.est2)/2
+    ard.theta.est <- ard.avg.coef[4]
 
-    ard.gate.est1
-    ard.gate.est2
-    ard.gate.est3
-
-    res.ard.true.model <- ARDSBMLinearRegressionSim(Y.sat, fmla, UganderCovariates, A.sat, H, P,Z.true, B.boot = B.boot, verbose = T)
-
-
+    res.ard.true.model <- ARDSBMSpilloverLinearRegressionSim(Y.sat, fmla, SpilloverCovariates, A.sat, P, Z.true, B.boot = B.boot, verbose = T)
     ard.true.model.avg.coef <- meanOverList(res.ard.true.model$coef)
 
-    ard.true.model.data <- meanOverList(res.ard.true.model$data)
-    ard.true.model.gate.est1 <- ard.true.model.avg.coef[3]/ard.true.model.avg.coef[1] + ard.true.model.avg.coef[4]/ard.true.model.avg.coef[1]
-    ard.true.model.gate.est2 <- ard.true.model.avg.coef[5]/ard.true.model.avg.coef[2] + ard.true.model.avg.coef[6]/ard.true.model.avg.coef[2]
-    ard.true.model.gate.est3 <- (ard.true.model.gate.est1 + ard.true.model.gate.est2)/2
+    ard.true.model.theta.est <- ard.true.model.avg.coef[4]
 
-    ard.true.model.gate.est1
-    ard.true.model.gate.est2
-    ard.true.model.gate.est3
 
     #data.mean.sub <- data
     #data.mean.sub$frac.treated <- 0.2630463*(data.mean.sub$frac.treated < 0.5) + 0.7369646*(data.mean.sub$frac.treated > 0.5)
@@ -263,29 +242,23 @@ for(j in seq(J)){
 
     #model.mean.sub$coefficients
     #TODO: make the HT estimator even better
-    gate.HT <- HTEstimatorCluster(Y.clust,G.true,A.clust,c.vec = Z.true,p.treat = p.treat)
 
-
-    gate.DM <- diffMeansEstimator(Y.clust,A.clust)
-    res.vec <- c(ard.gate.est1 - gate, ard.gate.est2 - gate, ard.gate.est3 - gate,
-                 ard.true.model.gate.est1 - gate, ard.true.model.gate.est2 - gate,
-                 ard.true.model.gate.est3 - gate,
-                 gate.est1 - gate, gate.est2 - gate, gate.est3 - gate,
-                 gate.HT - gate, gate.DM - gate)
+    res.vec <- c(ard.theta.est - theta,
+                 ard.true.model.theta.est - theta,
+                 theta.est - theta)
     names(res.vec) = NULL
     results[sim,,j] <- res.vec
   }
 }
 
 
-colnames(results) = c("ard1", "ard2", "ard3",
-                      "ard.tm1", "ard.tm2", "ard.tm3",
-                      "reg1", "reg2", "reg3",
-                      "HT", "DM")
+colnames(results) = c("ard",
+                      "ard.tm",
+                      "reg")
 
-filename <- paste0("data/UganderGATE_cluster_growth",cluster.growth,
+filename <- paste0("data/SpilloverGATE_cluster_growth",cluster.growth,
                    "mutual_benefit_", mutual.benefit,
-                   "sparse_graph_",sparse.graph,
+                   "cluster_equal_",cluster.equal.size,
                    "block",block,".rds")
 
 saveRDS(results, filename)
@@ -301,19 +274,17 @@ if(make.plots){
   png.height = 1000
   png.res = 200
 
-  mutual.benefit = F
-  cluster.growth = F
-  sparse.graph = T
 
-  filename <- paste0("data/UganderGATE_cluster_growth",cluster.growth,
+
+  filename <- paste0("data/SpilloverGATE_cluster_growth",cluster.growth,
                      "mutual_benefit_", mutual.benefit,
-                     "sparse_graph_",sparse.graph,
+                     "cluster_equal_",cluster.equal.size,
                      "block",1,".rds")
   results = readRDS(filename)
   for(i in seq(2,100)){
-    filename <- paste0("data/UganderGATE_cluster_growth",cluster.growth,
+    filename <- paste0("data/SpilloverGATE_cluster_growth",cluster.growth,
                        "mutual_benefit_", mutual.benefit,
-                       "sparse_graph_",sparse.graph,
+                       "cluster_equal_",cluster.equal.size,
                        "block",i,".rds")
     res.tmp <-readRDS(filename)
     results <- abind(results, res.tmp, along = 1)
@@ -362,9 +333,9 @@ if(make.plots){
     geom_line() +
     #geom_point() +
     #geom_errorbar(aes(ymin = ModelDev - 2*ModelDev_sd, ymax = ModelDev + 2*ModelDev_sd)) +
-    ggtitle("Bias of Methods") +
+    ggtitle("Mean Absolute Deviation of Methods") +
     xlab("log-Sample Size") +
-    ylab("RMSE") +
+    ylab("MAD") +
     coord_cartesian(
       xlim =c(min(log(sample.size.vec)),max(log(sample.size.vec))),
       ylim = c(0,10)
@@ -372,8 +343,33 @@ if(make.plots){
 
   #geom_errorbar(aes(ymin = lik.mean.scaled - 2*lik.sd.scaled, ymax = lik.mean.scaled + 2*lik.sd.scaled))
 
-  plt.rmse
+  #plt.rmse
+  file.bias <- paste0("plot/Bias_SpilloverGATE_cluster_growth",cluster.growth,
+                      "mutual_benefit_", mutual.benefit,
+                      "cluster_equal_",cluster.equal.size,".png")
+  file.rmse <- paste0("plot/RMSE_SpilloverGATE_cluster_growth",cluster.growth,
+                      "mutual_benefit_", mutual.benefit,
+                      "cluster_equal_",cluster.equal.size,".png")
 
+  ggsave(
+    filename = file.bias,
+    plot = plt.bias,
+    scale = 1,
+    width = png.width,
+    height = png.height,
+    units = "px",
+    dpi = png.res
+  )
+
+  ggsave(
+    filename = file.rmse,
+    plot = plt.rmse,
+    scale = 1,
+    width = png.width,
+    height = png.height,
+    units = "px",
+    dpi = png.res
+  )
 }
 
 

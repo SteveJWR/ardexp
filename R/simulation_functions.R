@@ -57,12 +57,13 @@ generateSBM <- function(n,P,PI,Z){
   return(list('G' = G, "groups" = A))
 }
 
-simUganderModelOutcomes <- function(G,H,A, a = 1, b = 2, delta = 1, gamma = 1, sigma = 1, scale.deg = F) {
+simUganderModelOutcomes <- function(G,H,A, a = 1, b = 2, delta = 1, gamma = 1, sigma = 1, scale.deg = T) {
   n = nrow(G)
   d.vec = as.numeric(G %*% rep(1,n))
   d.mean = mean(d.vec)
 
   eps <- rnorm(n)
+  nonoise.Y0 <- a + b*H
   if(scale.deg){
     Y0 <- (a + b*H + sigma*eps)*(d.vec/d.mean)
   } else {
@@ -73,8 +74,26 @@ simUganderModelOutcomes <- function(G,H,A, a = 1, b = 2, delta = 1, gamma = 1, s
   f = fracTreated(G,A)
   f[is.na(f)] = 0 # no neighbors means none are treated
   YA <-Y0*(1 + delta*A + gamma*f)
-  return(YA)
+  gate = mean(nonoise.Y0)*(delta + gamma)
+  return(list("Y" = YA, "GATE" = gate))
 }
+
+simSpilloverModelOutcomes <- function(G,A, a = 1, b = 1, delta = 1, gamma0 = 1, gamma1 = 0.2, sigma = 1) {
+  n = nrow(G)
+  d.vec = as.numeric(G %*% rep(1,n))
+  d.mean = mean(d.vec)
+
+  eps <- rnorm(n)
+  Y0 <- (a  + b*d.vec/d.mean + sigma*eps)
+
+  num.treated = as.numeric(G %*% A)
+  f = fracTreated(G,A)
+  f[is.na(f)] = 0 # no neighbors means none are treated
+
+  YA <- Y0 + delta*A + gamma0*(1 - A)*f + gamma1*(A)*f
+  return(list("Y" = YA))
+}
+
 
 # true only
 fracTreated <- function(G, A){
@@ -299,6 +318,15 @@ UganderCovariates <- function(G,H,A){
   return(cov.data)
 }
 
+SpilloverCovariates <- function(G,A){
+  d.vec = as.numeric(G %*% rep(1,n))
+  d.mean = mean(d.vec)
+  f <- fracTreated(G,A)
+  cov.data <- data.frame("A" = A,
+                         "frac.treated" = f,
+                         "deg.ratio" = d.vec/d.mean)
+  return(cov.data)
+}
 
 # H is a set of covariates
 # A are the treatments
@@ -306,10 +334,13 @@ UganderCovariates <- function(G,H,A){
 # This is just a parametric Bootstrap
 ARDSBMLinearRegressionSim <- function(Y,fmla, graphMapping, A, H, P, Z, B.boot = 200, verbose = F){
   n = length(Y)
+  A.0 <- rep(0,n)
+  A.1 <- rep(1,n)
   coef.list <- list()
   # almost certainly we should use a robust variance here
   var.list <- list()
   data.list <- list()
+  gate.list <- list()
   for(b in seq(B.boot)){
     if (verbose) {
       m1 = (round(20 * b/B.boot))
@@ -323,17 +354,64 @@ ARDSBMLinearRegressionSim <- function(Y,fmla, graphMapping, A, H, P, Z, B.boot =
     G = g.sim$G
     data <- graphMapping(G,H,A)
     data$Y <- Y
+
+    data.0 <- graphMapping(G,H,A.0)
+    data.1 <- graphMapping(G,H,A.1)
+    ## manual fix
+    data.0$frac.treated = 0
+    data.1$frac.treated = 1
+    model.sim <- lm(fmla, data = data)
+    Y.0 <- predict(model.sim, data.0)
+    Y.1 <- predict(model.sim, data.1)
+    gate = mean(Y.1) - mean(Y.0)
+    coef.list[[b]] <- model.sim$coefficients
+    var.list[[b]] <- sandwich::sandwich(model.sim)
+    data.list[[b]] <- data
+    gate.list[[b]] <- gate
+  }
+
+  return(list("coef" = coef.list, "var" = var.list, "data" = data.list, "gate" = gate.list))
+}
+
+
+ARDSBMSpilloverLinearRegressionSim <- function(Y,fmla, graphMapping, A, P, Z, B.boot = 200, verbose = F){
+  n = length(Y)
+  A.0 <- rep(0,n)
+  A.1 <- rep(1,n)
+  coef.list <- list()
+  # almost certainly we should use a robust variance here
+  var.list <- list()
+  data.list <- list()
+  gate.list <- list()
+  for(b in seq(B.boot)){
+    if (verbose) {
+      m1 = (round(20 * b/B.boot))
+      m2 = 20 - m1
+      progress.bar = paste0("|", strrep("=", m1), strrep("-",
+                                                         m2), "|")
+      cat(paste0("Resample:", b, "/", B.boot, "  ", progress.bar),
+          end = "\r")
+    }
+    g.sim <- generateSBM(n,P,Z = Z)
+    G = g.sim$G
+    data <- graphMapping(G,A)
+    data$Y <- Y
+
+    ## manual fix
+
     model.sim <- lm(fmla, data = data)
     coef.list[[b]] <- model.sim$coefficients
     var.list[[b]] <- sandwich::sandwich(model.sim)
     data.list[[b]] <- data
   }
+
   return(list("coef" = coef.list, "var" = var.list, "data" = data.list))
 }
 
 
-
-
+optimalDesignSpilloverSBM <- function(phi,graphMapping,P,Z,C,grid.steps = 10, B.boot = 200, M = 100, verbose = F){
+  length(unique())
+}
 
 
 
