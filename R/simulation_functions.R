@@ -78,7 +78,7 @@ simUganderModelOutcomes <- function(G,H,A, a = 1, b = 2, delta = 1, gamma = 1, s
   return(list("Y" = YA, "GATE" = gate))
 }
 
-simSpilloverModelOutcomes <- function(G,A, a = 1, b = 1, delta = 1, gamma0 = 1, gamma1 = 0.2, sigma = 1) {
+simSpilloverModelOutcomes <- function(G,A, a = 1, b = 0, delta = 1, gamma0 = 1, gamma1 = 0.2, sigma = 1) {
   n = nrow(G)
   d.vec = as.numeric(G %*% rep(1,n))
   d.mean = mean(d.vec)
@@ -408,15 +408,29 @@ ARDSBMSpilloverLinearRegressionSim <- function(Y,fmla, graphMapping, A, P, Z, B.
   return(list("coef" = coef.list, "var" = var.list, "data" = data.list))
 }
 
+# only randomizes over Z blocks
+optimalDesignSpilloverSBMGreedy <- function(phi,graphMapping,P,Z,grid.steps = 10, B.boot = 200, verbose = F, max.cycles = 10){
+  K = length(unique(Z))
+  tau.grid = seq(0,1,length.out = grid.steps)
+  tau.list =list()
+  G.list <- list()
+  for(b in seq(B.boot)){
+    if (verbose) {
+      m1 = (round(20 * b/B.boot))
+      m2 = 20 - m1
+      progress.bar = paste0("|", strrep("=", m1), strrep("-",
+                                                         m2), "|")
+      cat(paste0("Resample:", b, "/", B.boot, "  ", progress.bar),
+          end = "\r")
+    }
+    g.sim <- generateSBM(n,P,Z = Z)
+    G = g.sim$G
+  }
 
-optimalDesignSpilloverSBM <- function(phi,graphMapping,P,Z,C,grid.steps = 10, B.boot = 200, M = 100, verbose = F){
-  length(unique())
+  for(j in seq(grid.steps)){
+    tau.list[[j]] = tau.grid
+  }
+  tau.levels <- expand.grid(tau.list)
 }
-
-
-
-
-
-
 
 

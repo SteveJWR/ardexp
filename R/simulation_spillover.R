@@ -266,114 +266,155 @@ saveRDS(results, filename)
 
 
 
-make.plots = F
+make.plots = T
 if(make.plots){
-  library(ggpubr)
-  library(abind)
-  png.width = 1200
-  png.height = 1000
-  png.res = 200
+  for(id in seq(8)){
+    if(id %% 8 == 1){
+      mutual.benefit = T
+      cluster.growth = T
+      cluster.equal.size = T
 
-  cluster.growth = F
-  mutual.benefit = F
-  cluster.equal.size = T
+    } else if(id %% 8 == 2) {
+      mutual.benefit = F
+      cluster.growth = T
+      cluster.equal.size = T
 
-  filename <- paste0("data/Spillover_cluster_growth",cluster.growth,
-                     "mutual_benefit_", mutual.benefit,
-                     "cluster_equal_",cluster.equal.size,
-                     "block",1,".rds")
-  results = readRDS(filename)
-  for(i in seq(2,100)){
+    } else if(id %% 8 == 3) {
+      mutual.benefit = T
+      cluster.growth = F
+      cluster.equal.size = T
+
+    } else if(id %% 8 == 4) {
+      mutual.benefit = F
+      cluster.growth = F
+      cluster.equal.size = T
+
+    } else if(id %% 8 == 5) {
+      mutual.benefit = T
+      cluster.growth = T
+      cluster.equal.size = F
+
+    } else if(id %% 8 == 6) {
+      mutual.benefit = F
+      cluster.growth = T
+      cluster.equal.size = F
+
+    } else if(id %% 8 == 7) {
+      mutual.benefit = T
+      cluster.growth = F
+      cluster.equal.size = F
+
+    } else if(id %% 8 == 0) {
+      mutual.benefit = F
+      cluster.growth = F
+      cluster.equal.size = F
+
+    }
+    library(ggpubr)
+    library(abind)
+    png.width = 1200
+    png.height = 1000
+    png.res = 200
+
     filename <- paste0("data/Spillover_cluster_growth",cluster.growth,
                        "mutual_benefit_", mutual.benefit,
                        "cluster_equal_",cluster.equal.size,
-                       "block",i,".rds")
-    res.tmp <-readRDS(filename)
-    results <- abind(results, res.tmp, along = 1)
-  }
-  n.sims = dim(results)[1]
+                       "block",1,".rds")
+    results = readRDS(filename)
+    for(i in seq(2,100)){
+      filename <- paste0("data/Spillover_cluster_growth",cluster.growth,
+                         "mutual_benefit_", mutual.benefit,
+                         "cluster_equal_",cluster.equal.size,
+                         "block",i,".rds")
+      res.tmp <-readRDS(filename)
+      results <- abind(results, res.tmp, along = 1)
+    }
+    n.sims = dim(results)[1]
 
-  methods <- c("ard",
-               "ard.tm",
-               "reg")
+    methods <- c("ard",
+                 "ard.tm",
+                 "reg")
 
-  J = length(methods)
-  n.seq <- c(100,316,1000,3162, 10000)
-  sample.size.vec <- rep(n.seq, each = J)
-  N = length(n.seq)
+    J = length(methods)
+    n.seq <- c(100,316,1000,3162, 10000)
+    sample.size.vec <- rep(n.seq, each = J)
+    N = length(n.seq)
 
-  bias.vec = c()
-  rmse.vec = c()
-  for(j in seq(N)){
+    bias.vec = c()
+    rmse.vec = c()
+    for(j in seq(N)){
 
-    res.tmp = as.matrix(results[,,j])
-    bias.vec = c(bias.vec, colMeans(res.tmp, na.rm = T))
-    rmse.vec = c(rmse.vec, colMeans(abs(res.tmp)^2, na.rm = T)) # change to the mean absolute deviation
-  }
-  rmse.vec <- sqrt(rmse.vec)
+      res.tmp = as.matrix(results[,,j])
+      bias.vec = c(bias.vec, colMeans(res.tmp, na.rm = T))
+      rmse.vec = c(rmse.vec, colMeans(abs(res.tmp)^2, na.rm = T)) # change to the mean absolute deviation
+    }
+    rmse.vec <- sqrt(rmse.vec)
 
-  res.data <- data.frame("SampleSize" = sample.size.vec,
-                         "Method" = methods,
-                         "Bias" = bias.vec,
-                         "RMSE" = rmse.vec)
-  method.subset =  c("ard",
-                     "ard.tm",
-                     "reg")
-  res.data <- res.data[res.data$Method %in% method.subset, ]
+    res.data <- data.frame("SampleSize" = sample.size.vec,
+                           "Method" = methods,
+                           "Bias" = bias.vec,
+                           "RMSE" = rmse.vec)
+    method.subset =  c("ard",
+                       "ard.tm",
+                       "reg")
+    res.data <- res.data[res.data$Method %in% method.subset, ]
 
-  plt.bias <- ggplot(res.data, aes(x = log(SampleSize), y = Bias, group = Method,color = Method)) +
-    geom_line() +
-    #geom_point() +
-    #geom_errorbar(aes(ymin = ModelDev - 2*ModelDev_sd, ymax = ModelDev + 2*ModelDev_sd)) +
-    ggtitle("RMSE of Methods") +
-    xlab("log-Sample Size") +
-    ylab("Bias")
-  #geom_errorbar(aes(ymin = lik.mean.scaled - 2*lik.sd.scaled, ymax = lik.mean.scaled + 2*lik.sd.scaled))
+    plt.bias <- ggplot(res.data, aes(x = log(SampleSize), y = Bias, group = Method,color = Method)) +
+      geom_line() +
+      #geom_point() +
+      #geom_errorbar(aes(ymin = ModelDev - 2*ModelDev_sd, ymax = ModelDev + 2*ModelDev_sd)) +
+      ggtitle("RMSE of Methods") +
+      xlab("log-Sample Size") +
+      ylab("Bias")
+    #geom_errorbar(aes(ymin = lik.mean.scaled - 2*lik.sd.scaled, ymax = lik.mean.scaled + 2*lik.sd.scaled))
 
-  plt.bias
+    plt.bias
 
-  plt.rmse <- ggplot(res.data, aes(x = log(SampleSize), y = RMSE, group = Method,color = Method)) +
-    geom_line() +
-    #geom_point() +
-    #geom_errorbar(aes(ymin = ModelDev - 2*ModelDev_sd, ymax = ModelDev + 2*ModelDev_sd)) +
-    ggtitle("RMSE of Methods") +
-    xlab("log-Sample Size") +
-    ylab("RMSE") +
-    coord_cartesian(
-      xlim =c(min(log(sample.size.vec)),max(log(sample.size.vec))),
-      ylim = c(0,1)
+    plt.rmse <- ggplot(res.data, aes(x = log(SampleSize), y = RMSE, group = Method,color = Method)) +
+      geom_line() +
+      #geom_point() +
+      #geom_errorbar(aes(ymin = ModelDev - 2*ModelDev_sd, ymax = ModelDev + 2*ModelDev_sd)) +
+      ggtitle("RMSE of Methods") +
+      xlab("log-Sample Size") +
+      ylab("RMSE") +
+      coord_cartesian(
+        xlim =c(min(log(sample.size.vec)),max(log(sample.size.vec))),
+        ylim = c(0,1)
+      )
+    plt.rmse
+    #geom_errorbar(aes(ymin = lik.mean.scaled - 2*lik.sd.scaled, ymax = lik.mean.scaled + 2*lik.sd.scaled))
+
+    #plt.rmse
+    file.bias <- paste0("plot/Bias_Spillover_cluster_growth",cluster.growth,
+                        "mutual_benefit_", mutual.benefit,
+                        "cluster_equal_",cluster.equal.size,".png")
+    file.rmse <- paste0("plot/RMSE_Spillover_cluster_growth",cluster.growth,
+                        "mutual_benefit_", mutual.benefit,
+                        "cluster_equal_",cluster.equal.size,".png")
+
+    ggsave(
+      filename = file.bias,
+      plot = plt.bias,
+      scale = 1,
+      width = png.width,
+      height = png.height,
+      units = "px",
+      dpi = png.res
     )
-  plt.rmse
-  #geom_errorbar(aes(ymin = lik.mean.scaled - 2*lik.sd.scaled, ymax = lik.mean.scaled + 2*lik.sd.scaled))
 
-  #plt.rmse
-  file.bias <- paste0("plot/Bias_Spillover_cluster_growth",cluster.growth,
-                      "mutual_benefit_", mutual.benefit,
-                      "cluster_equal_",cluster.equal.size,".png")
-  file.rmse <- paste0("plot/RMSE_Spillover_cluster_growth",cluster.growth,
-                      "mutual_benefit_", mutual.benefit,
-                      "cluster_equal_",cluster.equal.size,".png")
-
-  ggsave(
-    filename = file.bias,
-    plot = plt.bias,
-    scale = 1,
-    width = png.width,
-    height = png.height,
-    units = "px",
-    dpi = png.res
-  )
-
-  ggsave(
-    filename = file.rmse,
-    plot = plt.rmse,
-    scale = 1,
-    width = png.width,
-    height = png.height,
-    units = "px",
-    dpi = png.res
-  )
+    ggsave(
+      filename = file.rmse,
+      plot = plt.rmse,
+      scale = 1,
+      width = png.width,
+      height = png.height,
+      units = "px",
+      dpi = png.res
+    )
+  }
 }
+
+
 
 
 
