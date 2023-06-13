@@ -6,15 +6,13 @@ rm(list = ls())
 source("R/ardexp.R") # functions for the main
 source("R/simulation_functions.R") # has the additional simulations pieces
 
-# package for estimating simple SBM's
-library(sbm)
-## competing methods DM, HT, Oracle Regression, Partial Data Regression, Partial Data Regression (Estimated Clusters)
+
 
 
 slurm_arrayid <- Sys.getenv('SLURM_ARRAY_TASK_ID')
 print(Sys.getenv('SLURM_ARRAY_TASK_ID'))
 if(slurm_arrayid == ""){
-  id = 3
+  id = 1
 } else {
   # coerce the value to an integer
   id <- as.numeric(slurm_arrayid)
@@ -31,7 +29,6 @@ if(id %% 8 == 1){
 
 #village number
 block = ceiling(id/2)
-block = 1
 
 # True model parameters
 a = 1
