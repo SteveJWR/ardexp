@@ -105,6 +105,33 @@ estimatePmat <- function(Z.hat, G){
 }
 
 
+estimatePmatARD <- function(Z.hat, X){
+  K <- length(unique(Z.hat))
+  n <- nrow(X)
+  P <- matrix(NA, nrow = K, ncol = K)
+
+  for(i in seq(K)){
+    for(j in seq(K)){
+      if(i <= j){
+        idx.1 = which(Z.hat == i)
+
+        X.sub = X[idx.1, j]
+        if(i != j){
+          n.total <- length(idx.1)*(sum(Z.hat == j))
+        } else {
+          n.total <- length(idx.1)*(sum(Z.hat == j) - 1)
+        }
+
+        p.hat = sum(X.sub)/n.total
+        P[i,j] = p.hat
+
+      }
+    }
+  }
+  P[lower.tri(P)] = t(P)[lower.tri(t(P))]
+  return(P)
+}
+
 
 
 
