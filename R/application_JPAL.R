@@ -23,10 +23,10 @@ if(slurm_arrayid == ""){
 }
 
 
-if(id %% 8 == 1){
+if(id %% 2 == 1){
   mutual.benefit = T
 
-} else if(id %% 8 == 2) {
+} else if(id %% 2 == 2) {
   mutual.benefit = F
 
 }
