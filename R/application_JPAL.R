@@ -23,16 +23,16 @@ if(slurm_arrayid == ""){
 }
 
 
-if(id %% 2 == 1){
-  mutual.benefit = T
-
-} else if(id %% 2 == 2) {
-  mutual.benefit = F
-
-}
+# if(id %% 2 == 1){
+#   mutual.benefit = T
+#
+# } else if(id %% 2 == 2) {
+#   mutual.benefit = F
+#
+# }
 
 #village number
-block = ceiling(id/2)
+block = id
 
 # True model parameters
 a = 1
@@ -43,6 +43,7 @@ delta = 1
 sigma = 0.5 # how much noise are we willing to permit here?
 
 
+mutual.benefit = T
 
 if(mutual.benefit){
   gamma0 = 1
@@ -270,8 +271,7 @@ colnames(results) = c("ard",
                       "ard.tm",
                       "reg")
 
-filename <- paste0("data/JPAL_sim_results/JPAL_village_",block,
-                   "mutual_benefit_", mutual.benefit,".rds")
+filename <- paste0("data/JPAL_sim_results/JPAL_village_",block,".rds")
 
 saveRDS(results, filename)
 
