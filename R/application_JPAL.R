@@ -11,7 +11,7 @@ source("R/simulation_functions.R") # has the additional simulations pieces
 library(reshape2)
 library(ggplot2)
 library(igraph)
-library(lsa) # for cosine similarity
+# library(lsa) # for cosine similarity
 
 
 slurm_arrayid <- Sys.getenv('SLURM_ARRAY_TASK_ID')
