@@ -20,13 +20,13 @@ if(slurm_arrayid == ""){
   id = 1
 } else {
   # coerce the value to an integer
-  id <- as.numeric(slurm_arrayid)
+  id <- as.numeric(slurm_arrayid) + 1
 }
 
 
 block = id %% 77  # repeat every 77
 
-K_set = seq(5,100,5) # There are 20 on this scale.
+K_set = seq(5,65,5) # There are 20 on this scale.
 
 K_idx = id %/% 77 + 1
 K = K_set[K_idx]
