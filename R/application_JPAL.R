@@ -1,6 +1,6 @@
 
 
-## Simuations to compare the full data and spillover parameters
+## Simulations to compare the full data and spillover parameters
 
 rm(list = ls())
 source("R/ardexp.R") # functions for the main
@@ -10,7 +10,8 @@ source("R/simulation_functions.R") # has the additional simulations pieces
 
 library(reshape2)
 library(ggplot2)
-
+library(igraph)
+library(lsa) # for cosine similarity
 
 
 slurm_arrayid <- Sys.getenv('SLURM_ARRAY_TASK_ID')
@@ -23,16 +24,15 @@ if(slurm_arrayid == ""){
 }
 
 
-# if(id %% 2 == 1){
-#   mutual.benefit = T
-#
-# } else if(id %% 2 == 2) {
-#   mutual.benefit = F
-#
-# }
+block = id %% 77  # repeat every 77
 
+K_set = seq(5,100,5) # There are 20 on this scale.
+
+K_idx = id %/% 77 + 1
+K = K_set[K_idx]
 #village number
-block = id
+# Total 77 villages
+
 
 # True model parameters
 a = 1
@@ -55,64 +55,54 @@ if(mutual.benefit){
 
 data.file <- paste0("data/JPAL/Data/1. Network Data/Adjacency Matrices/adj_allVillageRelationships_vilno_", block, ".csv")
 
-#data.file <- paste0("data/JPAL/Data/1. Network Data/Adjacency Matrices/adj_andRelationships_vilno_", block, ".csv")
-
-#data.file.lend <- paste0("data/JPAL/Data/1. Network Data/Adjacency Matrices/adj_lendmoney_vilno_", block, ".csv")
-#data.file.borrow <- paste0("data/JPAL/Data/1. Network Data/Adjacency Matrices/adj_borrowmoney_vilno_", block, ".csv")
-#data.file.keroricecome <- paste0("data/JPAL/Data/1. Network Data/Adjacency Matrices/adj_keroricecome_vilno_", block, ".csv")
-#data.file.keroricego <- paste0("data/JPAL/Data/1. Network Data/Adjacency Matrices/adj_keroricego_vilno_", block, ".csv")
-#data.file<- paste0("data/JPAL/Data/1. Network Data/Adjacency Matrices/adj_nonrel_vilno_", block, ".csv")
-
-
-
-
-# G.lend <- read.csv(data.file.lend, header = FALSE)
-# G.lend <- as.matrix(G.lend)
-# colnames(G.lend) = NULL
-# rownames(G.lend) = NULL
-#
-# G.borrow <- read.csv(data.file.borrow, header = FALSE)
-# G.borrow <- as.matrix(G.borrow)
-# colnames(G.borrow) = NULL
-# rownames(G.borrow) = NULL
-#
-# G.keroricecome <- read.csv(data.file.keroricecome, header = FALSE)
-# G.keroricecome <- as.matrix(G.keroricecome)
-# colnames(G.keroricecome) = NULL
-# rownames(G.keroricecome) = NULL
-#
-#
-# G.keroricego <- read.csv(data.file.keroricego, header = FALSE)
-# G.keroricego <- as.matrix(G.keroricego)
-# colnames(G.keroricego) = NULL
-# rownames(G.keroricego) = NULL
-
-# G <- (G.lend + G.borrow)
-#
-
 
 
 G <- read.csv(data.file, header = FALSE)
 G <- as.matrix(G)
 colnames(G) = NULL
 rownames(G) = NULL
-diag(G) = 0 # TODO: Ask Tyler About this, why there are any self edges
+diag(G) = 0 # Remove self edges from the noisy sample
 G <- G + t(G)
 G[G > 0] = 1
-
 G.true <- G
 
 
 g <- graph_from_adjacency_matrix(G.true, mode = "undirected")
-
-clust <- igraph::spectrum(g)
-
-plot(g, vertex.size=3, vertex.label=NA)
-
-# remove dangling individuals
+# remove unconnected individuals
 idx = which(colSums(G.true) > 0)
 G.true = G.true[idx,idx]
 g <- graph_from_adjacency_matrix(G.true, mode = "undirected")
+
+clust_greedy = cluster_fast_greedy(g)
+
+clust_greedy_K = clust_greedy %>% as.hclust() %>% cutree(4)
+plot_dendrogram(clust_greedy)
+
+clusters.list = rect.hclust(clust_greedy, k = 1, border="blue")
+### Simple community detection algorithm
+# hierarchical clustering
+A = get.adjacency(g, sparse=FALSE)
+
+
+# cosine similarity
+S = cosine(A)
+
+# distance matrix
+D = 1-S
+
+# distance object
+d = as.dist(D)
+
+# average-linkage clustering method
+cc = hclust(d, method = "average")
+
+# plot dendrogram
+plot(cc)
+
+# draw blue borders around clusters
+clusters.list = rect.hclust(cc, k = 4, border="blue")
+
+
 
 # Off-the-shelf community detection algorithm
 clust = cluster_fast_greedy(g)
@@ -146,22 +136,6 @@ if(estimate.sbm){
 theta = gamma1 - gamma0
 
 n.sims =  100#
-
-
-# treatment probability for graph cluster designs
-#p.treat = 0.5 #TODO: remove this
-
-
-
-#p.in.seq = rep(0.2, J)
-#p.out.seq = rep(0.02, J)
-
-# other simulation parameters
-# binomial.randomization <- F #TODO: remove this
-
-# In order to have some degree heterogeneity, we say that the clusters have an
-# equal spacing of parameters.
-
 
 # Only compare the full data and partial data versions
 n.methods = 3
@@ -251,15 +225,6 @@ for(sim in seq(n.sims)){
 
   ard.true.model.theta.est <- ard.true.model.avg.coef[5]
 
-
-  #data.mean.sub <- data
-  #data.mean.sub$frac.treated <- 0.2630463*(data.mean.sub$frac.treated < 0.5) + 0.7369646*(data.mean.sub$frac.treated > 0.5)
-  #cor(data.mean.sub)
-  #model.mean.sub <- lm(fmla, data.mean.sub)
-
-  #model.mean.sub$coefficients
-  #TODO: make the HT estimator even better
-
   res.vec <- c(ard.theta.est - theta,
                ard.true.model.theta.est - theta,
                theta.est - theta)
@@ -271,142 +236,6 @@ colnames(results) = c("ard",
                       "ard.tm",
                       "reg")
 
-filename <- paste0("data/JPAL_sim_results/JPAL_village_",block,".rds")
+filename <- paste0("data/JPAL_sim_results/JPAL_village_",block,"_K_", K,".rds")
 
 saveRDS(results, filename)
-
-
-
-
-
-# longData<-melt(P.true)
-# longData<-melt(P.hat - P.true)
-# longData<-longData[longData$value!=0,]
-#
-# ggplot(longData, aes(x = Var2, y = Var1)) +
-#   geom_raster(aes(fill=value)) +
-#   scale_fill_gradient(low="grey90", high="red") +
-#   labs(x="letters", y="LETTERS", title="Matrix") +
-#   theme_bw() + theme(axis.text.x=element_text(size=9, angle=0, vjust=0.3),
-#                      axis.text.y=element_text(size=9),
-#                      plot.title=element_text(size=11))
-#
-#
-#
-# # figure out this plots thing next
-# make.plots = F
-# if(make.plots){
-#   for(id in seq(2)){
-#     if(id %% 8 == 1){
-#       mutual.benefit = T
-#
-#     } else if(id %% 8 == 2) {
-#       mutual.benefit = F
-#
-#     }
-#     library(ggpubr)
-#     library(abind)
-#     png.width = 1200
-#     png.height = 1000
-#     png.res = 200
-#
-#     filename <- paste0("data/JPAL_village_",1,
-#                        "mutual_benefit_", mutual.benefit,".rds")
-#     results = readRDS(filename)
-#     for(i in seq(2,72)){
-#       filename <- paste0("data/JPAL_village_",i,
-#                          "mutual_benefit_", mutual.benefit,".rds")
-#       res.tmp <-readRDS(filename)
-#       results <- abind(results, res.tmp, along = 1)
-#     }
-#     n.sims = dim(results)[1]
-#
-#     methods <- c("ard",
-#                  "ard.tm",
-#                  "reg")
-#
-#     J = length(methods)
-#     n.seq <- c(100,316,1000,3162, 10000)
-#     sample.size.vec <- rep(n.seq, each = J)
-#     N = length(n.seq)
-#
-#     bias.vec = c()
-#     rmse.vec = c()
-#     for(j in seq(N)){
-#
-#       res.tmp = as.matrix(results[,,j])
-#       bias.vec = c(bias.vec, colMeans(res.tmp, na.rm = T))
-#       rmse.vec = c(rmse.vec, colMeans(abs(res.tmp)^2, na.rm = T)) # change to the mean absolute deviation
-#     }
-#     rmse.vec <- sqrt(rmse.vec)
-#
-#     res.data <- data.frame("SampleSize" = sample.size.vec,
-#                            "Method" = methods,
-#                            "Bias" = bias.vec,
-#                            "RMSE" = rmse.vec)
-#     method.subset =  c("ard",
-#                        "ard.tm",
-#                        "reg")
-#     res.data <- res.data[res.data$Method %in% method.subset, ]
-#
-#     plt.bias <- ggplot(res.data, aes(x = log(SampleSize), y = Bias, group = Method,color = Method)) +
-#       geom_line() +
-#       #geom_point() +
-#       #geom_errorbar(aes(ymin = ModelDev - 2*ModelDev_sd, ymax = ModelDev + 2*ModelDev_sd)) +
-#       ggtitle("RMSE of Methods") +
-#       xlab("log-Sample Size") +
-#       ylab("Bias")
-#     #geom_errorbar(aes(ymin = lik.mean.scaled - 2*lik.sd.scaled, ymax = lik.mean.scaled + 2*lik.sd.scaled))
-#
-#     plt.bias
-#
-#     plt.rmse <- ggplot(res.data, aes(x = log(SampleSize), y = RMSE, group = Method,color = Method)) +
-#       geom_line() +
-#       #geom_point() +
-#       #geom_errorbar(aes(ymin = ModelDev - 2*ModelDev_sd, ymax = ModelDev + 2*ModelDev_sd)) +
-#       ggtitle("RMSE of Methods") +
-#       xlab("log-Sample Size") +
-#       ylab("RMSE") +
-#       coord_cartesian(
-#         xlim =c(min(log(sample.size.vec)),max(log(sample.size.vec))),
-#         ylim = c(0,1)
-#       )
-#     plt.rmse
-#     #geom_errorbar(aes(ymin = lik.mean.scaled - 2*lik.sd.scaled, ymax = lik.mean.scaled + 2*lik.sd.scaled))
-#
-#     #plt.rmse
-#     file.bias <- paste0("plot/Bias_Spillover_cluster_growth",cluster.growth,
-#                         "mutual_benefit_", mutual.benefit,
-#                         "cluster_equal_",cluster.equal.size,".png")
-#     file.rmse <- paste0("plot/RMSE_Spillover_cluster_growth",cluster.growth,
-#                         "mutual_benefit_", mutual.benefit,
-#                         "cluster_equal_",cluster.equal.size,".png")
-#
-#     ggsave(
-#       filename = file.bias,
-#       plot = plt.bias,
-#       scale = 1,
-#       width = png.width,
-#       height = png.height,
-#       units = "px",
-#       dpi = png.res
-#     )
-#
-#     ggsave(
-#       filename = file.rmse,
-#       plot = plt.rmse,
-#       scale = 1,
-#       width = png.width,
-#       height = png.height,
-#       units = "px",
-#       dpi = png.res
-#     )
-#   }
-# }
-#
-#
-#
-#
-#
-#
-#
