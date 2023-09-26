@@ -75,52 +75,14 @@ g <- graph_from_adjacency_matrix(G.true, mode = "undirected")
 
 clust_greedy = cluster_fast_greedy(g)
 
-clust_greedy_K = clust_greedy %>% as.hclust() %>% cutree(4)
-plot_dendrogram(clust_greedy)
-
-clusters.list = rect.hclust(clust_greedy, k = 1, border="blue")
-### Simple community detection algorithm
-# hierarchical clustering
-A = get.adjacency(g, sparse=FALSE)
-
-
-# cosine similarity
-S = cosine(A)
-
-# distance matrix
-D = 1-S
-
-# distance object
-d = as.dist(D)
-
-# average-linkage clustering method
-cc = hclust(d, method = "average")
-
-# plot dendrogram
-plot(cc)
-
-# draw blue borders around clusters
-clusters.list = rect.hclust(cc, k = 4, border="blue")
-
-
-
-# Off-the-shelf community detection algorithm
-clust = cluster_fast_greedy(g)
-
-# modularity measure
-modularity(clust)
-## [1] 0.3934089
-# plot communities with shaded regions
-coords = layout_with_fr(g)
-plot(clust, g, layout=coords, vertex.size=3, vertex.label=NA)
-
+clust_greedy_K = clust_greedy %>% as.hclust() %>% cutree(K)
 
 estimate.sbm <- T
 if(estimate.sbm){
   #sbm.true <- sbm::estimateSimpleSBM(G)
 
   # all we need are the "true clusters"
-  Z.true <- clust$membership
+  Z.true <- clust_greedy_K
   P.true <- estimatePmat(Z.true,G.true)
   P.true = (P.true + t(P.true))/2
 
