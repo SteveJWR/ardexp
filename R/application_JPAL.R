@@ -27,7 +27,7 @@ if(slurm_arrayid == ""){
 block = id %% 77  # repeat every 77
 
 K_set = seq(70,100,5) # There are 20 on this scale.
-
+K_set = seq(120,300,20)
 K_idx = id %/% 77 + 1
 K = K_set[K_idx]
 #village number
