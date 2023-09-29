@@ -26,8 +26,8 @@ if(slurm_arrayid == ""){
 
 block = id %% 77  # repeat every 77
 
-K_set = seq(70,100,5) # There are 20 on this scale.
-K_set = seq(120,300,20)
+K_set = seq(4,44,4) # There are 20 on this scale.
+#K_set = seq(120,300,20)
 K_idx = id %/% 77 + 1
 K = K_set[K_idx]
 #village number
@@ -55,10 +55,31 @@ if(mutual.benefit){
 
 data.file <- paste0("data/JPAL/Data/1. Network Data/Adjacency Matrices/adj_allVillageRelationships_vilno_", block, ".csv")
 
+data.file <- paste0("DoNotUpload/Network Data/MicroFinance Wave 2/Graphs.mat")
 
 
-G <- read.csv(data.file, header = FALSE)
-G <- as.matrix(G)
+graphs = R.matlab::readMat(data.file)
+
+graphs = graphs$Z[[block]][[1]]
+views = length(graphs)
+G = NULL
+for (view in seq(views)){
+  if( is.null(G) ) {
+    G = as.matrix(graphs[view][[1]][[1]])
+  }
+
+  else {
+    if(! is.null(graphs[view][[1]][[1]])){
+      G = G + as.matrix(graphs[view][[1]][[1]])
+    }
+  }
+}
+
+G
+
+
+#G <- read.csv(data.file, header = FALSE)
+#G <- as.matrix(G)
 colnames(G) = NULL
 rownames(G) = NULL
 diag(G) = 0 # Remove self edges from the noisy sample
@@ -74,9 +95,10 @@ G.true = G.true[idx,idx]
 g <- graph_from_adjacency_matrix(G.true, mode = "undirected")
 
 clust_greedy = cluster_fast_greedy(g)
-
+clust_greedy = cluster_leading_eigen(g) # The quality of the ARD is highly dependent on the quality of the clustering.  Having too large groups dilutes
+# the structure and causes poor approximation
 clust_greedy_K = clust_greedy %>% as.hclust() %>% cutree(K)
-
+table(clust_greedy_K)
 estimate.sbm <- T
 if(estimate.sbm){
   #sbm.true <- sbm::estimateSimpleSBM(G)
@@ -98,7 +120,7 @@ if(estimate.sbm){
 theta = gamma1 - gamma0
 
 n.sims =  100#
-
+n.sims = 20 # TODO: remove this before uploading
 # Only compare the full data and partial data versions
 n.methods = 3
 results <- array(NA, c(n.sims, n.methods))
