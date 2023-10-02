@@ -9,25 +9,55 @@ library(sandwich)
 
 
 
+generateSBM <- function(n,P,PI,Z){
+  if(missing(Z)){
+    if(nrow(P) != ncol(P)){
+      stop("P must be symmetric")
+    }
+    if(sum(abs(P  - t(P))) > 0.01){
+      stop("P must be symmetric")
+    }
+    if(length(PI) != nrow(P)){
+      stop("proportions and P must be of the same dimension")
+    }
+    n.groups = round(n*PI/(sum(PI)))
+    K = length(PI)
+    while(sum(n.groups) < n){
+      i = sample(seq(K), size = 1)
+      n.groups[i] = n.groups[i] + 1
+    }
+    while(sum(n.groups) > n){
+      i = sample(seq(K), size = 1)
+      n.groups[i] = n.groups[i] - 1
+    }
+    K = length(PI)
+    groups = rep(seq(K),times = n.groups)
+    g = igraph::sample_sbm(n,pref.matrix = P, block.sizes = n.groups)
+    G = igraph::as_adjacency_matrix(g)
 
+  } else {
+    K = max(Z)
+    n.groups <- rep(NA,K)
+    for(i in seq(K)){
+      n.groups[i] = sum(Z == i)
+    }
 
+    # permute the ordering at the end so that it will agree with Z
+    g = igraph::sample_sbm(n,pref.matrix = P, block.sizes = n.groups)
+    G = igraph::as_adjacency_matrix(g)
 
-# generateSBM2 <- function(n,P,pi){
-#   if(nrow(P) != ncol(P)){
-#     stop("P must be symmetric")
-#   }
-#   if(sum(abs(P  - t(P))) > 0.01){
-#     stop("P must be symmetric")
-#   }
-#   if(length(pi) != nrow(P)){
-#     stop("proportions and P must be of the same dimension")
-#   }
-#   n.groups = round(n*pi/(sum(pi)))
-#   K = length(pi)
-#   Z = rep(seq(K),times = n.groups)
-#   U <- runif(choose(n,2))
-#   P.large <-
-# }
+    Z.original = rep(seq(K),times = n.groups)
+    perm = invPerm(order(Z))
+    # marks the end of the groups
+
+    # permute the appropriate Z
+    G <- G[perm,perm]
+    groups = Z
+
+  }
+  return(list('G' = G, "groups" = groups))
+}
+
 
 traitsSample <- function(Z,Q){
   n = length(Z)
