@@ -46,7 +46,7 @@ b = 1
 delta = 1
 
 # simulation noise (variance)
-sigma = 0.5 # how much noise are we willing to permit here?
+sigma = 1 # how much noise are we willing to permit here?
 
 
 mutual.benefit = T
@@ -157,8 +157,6 @@ for(sim in seq(n.sims)){
   cat(paste0("Sim: ", sim, "/", n.sims), end = "\r")
   n = nrow(G.true)
   K = max(Z.true) # number of true clusters
-
-
 
   #H <- simH(Z.true)
   H = rep(NA,n)
