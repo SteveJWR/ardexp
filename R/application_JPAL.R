@@ -27,9 +27,8 @@ if(slurm_arrayid == ""){
 block = id %% 77  # repeat every 77
 
 
-# TODO: return the max to 22
-K.max = 8
-K_set = seq(K.max,K.max,2)
+K.max = 16
+K_set = seq(4,K.max,2)
 
 
 #K_set = seq(120,300,20)
