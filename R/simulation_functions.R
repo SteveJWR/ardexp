@@ -1,62 +1,6 @@
 
 
 ### replication of the simple Ugander response model
-# generates an SBM with fixed proportions PI.
-# or if there is no PI, then use Z
-generateSBM <- function(n,P,PI,Z){
-  if(missing(Z)){
-    if(nrow(P) != ncol(P)){
-      stop("P must be symmetric")
-    }
-    if(sum(abs(P  - t(P))) > 0.01){
-      stop("P must be symmetric")
-    }
-    if(length(PI) != nrow(P)){
-      stop("proportions and P must be of the same dimension")
-    }
-    n.groups = round(n*PI/(sum(PI)))
-    K = length(PI)
-    while(sum(n.groups) < n){
-      i = sample(seq(K), size = 1)
-      n.groups[i] = n.groups[i] + 1
-    }
-    while(sum(n.groups) > n){
-      i = sample(seq(K), size = 1)
-      n.groups[i] = n.groups[i] - 1
-    }
-    K = length(PI)
-    A = rep(seq(K),times = n.groups)
-    g = igraph::sample_sbm(n,pref.matrix = P, block.sizes = n.groups)
-    G = igraph::as_adjacency_matrix(g)
-  } else {
-    K = max(Z)
-    n.groups <- rep(NA,K)
-    for(i in seq(K)){
-      n.groups[i] = sum(Z == i)
-    }
-
-    # permute the ordering at the end so that it will agree with Z
-    g = igraph::sample_sbm(n,pref.matrix = P, block.sizes = n.groups)
-    G = igraph::as_adjacency_matrix(g)
-
-    # marks the end of the groups
-    group.end.idx <- cumsum(n.groups)
-
-    rev.perm <- rep(NA,n)
-    for(i in seq(n)){
-      rev.perm[i] = group.end.idx[Z[i]]
-      group.end.idx[Z[i]] = group.end.idx[Z[i]] - 1
-    }
-    perm = rev.perm[invPerm(rev.perm)]
-
-    # permute the appropriate Z
-    G <- G[perm,perm]
-    A = Z
-
-  }
-  return(list('G' = G, "groups" = A))
-}
-
 simUganderModelOutcomes <- function(G,H,A, a = 1, b = 2, delta = 1, gamma = 1, sigma = 1, scale.deg = T) {
   n = nrow(G)
   d.vec = as.numeric(G %*% rep(1,n))
