@@ -18,14 +18,14 @@ library(blockmodels)
 slurm_arrayid <- Sys.getenv('SLURM_ARRAY_TASK_ID')
 print(Sys.getenv('SLURM_ARRAY_TASK_ID'))
 if(slurm_arrayid == ""){
-  id = 318
+  id = 1
 } else {
   # coerce the value to an integer
-  id <- as.numeric(slurm_arrayid) + 1
+  id <- as.numeric(slurm_arrayid) # for zero indexing
 }
 
 
-block = id %% 77  # repeat every 77
+block = id %% 77  + 1 # repeat every 77
 
 
 K.max = 22
@@ -46,7 +46,7 @@ b = 1
 delta = 1
 
 # simulation noise (variance)
-sigma = 0.05 # how much noise are we willing to permit here?
+sigma = 0.5 # how much noise are we willing to permit here?
 
 
 mutual.benefit = T
@@ -102,7 +102,7 @@ g <- graph_from_adjacency_matrix(G.true, mode = "undirected")
 
 
 ## Stochastic block-model clustering
-b.model <- BM_bernoulli(membership_type = 'SBM_sym', adj = G.true, explore_min = K.max)
+b.model <- BM_bernoulli(membership_type = 'SBM_sym', adj = G.true, explore_min = K.max, explore_max = K.max)
 b.model$estimate()
 clust_bm_K = apply(b.model$memberships[[K]]$Z, 1,which.max)
 
