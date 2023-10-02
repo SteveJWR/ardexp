@@ -11,6 +11,7 @@ source("R/simulation_functions.R") # has the additional simulations pieces
 library(reshape2)
 library(ggplot2)
 library(igraph)
+library(blockmodels)
 # library(lsa) # for cosine similarity
 
 
@@ -27,7 +28,7 @@ if(slurm_arrayid == ""){
 block = id %% 77  # repeat every 77
 
 
-K.max = 16
+K.max = 22
 K_set = seq(4,K.max,2)
 
 
