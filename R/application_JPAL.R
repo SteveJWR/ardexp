@@ -134,14 +134,14 @@ if(estimate.sbm){
 #Global average treatment effect
 theta = gamma1 - gamma0
 
-n.sims =  1000#
+n.sims =  400#
 
 # Only compare the full data and partial data versions
 n.methods = 3
 results <- array(NA, c(n.sims, n.methods))
 results_sd <- array(NA, c(n.sims, n.methods))
 # Methods tuning parameters
-B.boot = 500
+B.boot = 100
 #### Simulations Start
 
 # formula for the regression model
