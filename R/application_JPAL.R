@@ -12,6 +12,7 @@ library(reshape2)
 library(ggplot2)
 library(igraph)
 library(blockmodels)
+library(sandwich)
 # library(lsa) # for cosine similarity
 
 
@@ -138,7 +139,7 @@ n.sims =  1000#
 # Only compare the full data and partial data versions
 n.methods = 3
 results <- array(NA, c(n.sims, n.methods))
-
+results_sd <- array(NA, c(n.sims, n.methods))
 # Methods tuning parameters
 B.boot = 500
 #### Simulations Start
@@ -218,16 +219,23 @@ for(sim in seq(n.sims)){
   res.vec <- c(ard.theta.est - theta,
                ard.true.model.theta.est - theta,
                theta.est - theta)
+  res_sd.vec <- sqrt(c(sandwich(ard.mean.model)[5,5],
+               sandwich(ard.true.mean.model)[5,5],
+               sandwich(model)[5,5]))
 
 
   names(res.vec) = NULL
+  names(res_sd.vec) = NULL
   results[sim,] <- res.vec
+  results_sd[sim,] <- res_sd.vec
 }
 
 colnames(results) = c("ard",
                       "ard.tm",
                       "reg")
-
+colnames(results_sd) = c("ard",
+                      "ard.tm",
+                      "reg")
 
 
 print(colMeans(round(results,6)))
@@ -235,6 +243,12 @@ print(colMeans(round(results,6)))
 filename <- paste0("data/JPAL_sim_results/JPAL_village_",block,"_K_", K,".rds")
 
 saveRDS(results, filename)
+
+print(colMeans(round(results,6)))
+
+filename_sd <- paste0("data/JPAL_sim_results/JPAL_village_sd_",block,"_K_", K,".rds")
+
+saveRDS(results_sd, filename_sd)
 
 # TODO: Add the comment
 
