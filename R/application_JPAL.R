@@ -44,7 +44,7 @@ K = K_set[K_idx]
 # True model parameters
 a = 1
 b = 1
-delta = 1
+delta = 2
 
 # simulation noise (variance)
 sigma = 1 # how much noise are we willing to permit here?
@@ -53,10 +53,10 @@ sigma = 1 # how much noise are we willing to permit here?
 mutual.benefit = T
 
 if(mutual.benefit){
-  gamma0 = 1
+  gamma0 = 1.7
   gamma1 = 0.2
 } else {
-  gamma0 = -1
+  gamma0 = -1.7
   gamma1 = -0.2
 }
 
