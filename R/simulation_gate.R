@@ -80,7 +80,7 @@ if(mutual.benefit){
 }
 
 
-# Think of a second version of the simulation where there is a competative advantage to treatment
+# Think of a second version of the simulation where there is a competitive advantage to treatment
 # but that wears off if everyone else around you has it
 
 #Global average treatment effect
