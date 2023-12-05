@@ -295,7 +295,7 @@ saveRDS(results, filename)
 
 filename_coverage <- paste0("data/JPAL_sim_results/GATE_JPAL_village_",block,"_K_", K,"_coverage.rds")
 
-saveRDS(results_sd, filename_sd)
+saveRDS(results_cover, filename_coverage)
 
 #
 
