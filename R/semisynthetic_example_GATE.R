@@ -28,7 +28,7 @@ block = id %% 77  + 1 # repeat every 77
 
 
 # Maximum number of possible clusters to search for.
-K.max = 10
+K.max = 22
 K_set = seq(4,K.max,2)
 
 
