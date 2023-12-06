@@ -23,7 +23,7 @@ if(slurm_arrayid == ""){
   id <- as.numeric(slurm_arrayid) # for zero indexing
 }
 
-
+set.seed(id)
 block = id %% 77  + 1 # repeat every 77
 
 
@@ -146,14 +146,11 @@ sat.frac = 1/2 #treat half of the clusters at 0.9 and the other half at 0.1
 p.high.level = 0.9
 p.low.level = 0.1
 
-
+n = nrow(G.true)
+K = max(Z.true) # number of true clusters
+H <- simH(Z.true)
 for(sim in seq(n.sims)){
   cat(paste0("Sim: ", sim, "/", n.sims), end = "\r")
-  n = nrow(G.true)
-  K = max(Z.true) # number of true clusters
-
-  H <- simH(Z.true)
-  #H = rep(NA,n)
 
   # whether to do binomial randomization or the true cluster treatment
   K.high.level <- round(sat.frac*K)
@@ -257,10 +254,10 @@ for(sim in seq(n.sims)){
   outcome.cluster.treat <- simUganderModelOutcomes(G.true, H, A.cluster.treat, a = a, b = b, delta = delta, gamma = gamma, sigma = sigma)
   Y.cluster.treat <- outcome.cluster.treat$Y
 
-  DM.est <- diffMeansEstimator(Y.sat,A.cluster.treat)
+  DM.est <- diffMeansEstimator(Y.cluster.treat,A.cluster.treat)
+
 
   HT.est <- HTEstimatorCluster(Y.cluster.treat, G.true, A.cluster.treat, Z.true, p.treat = 1/2)
-
 
   res.vec <- c(gate.ard.est - true.gate,
                gate.ard.true.model.est - true.gate,
