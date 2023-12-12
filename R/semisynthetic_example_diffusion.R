@@ -90,7 +90,7 @@ if(on.cluster){
 print(colnames(hh_dat))
 
 
-village_dat = hh_dat %>% filter(villageid == block)
+village_dat = hh_dat[village_dat$villageid == block,]
 seeds  <- village_dat$seed_dummy
 
 ## Simulations to compare the full data and spillover parameters
