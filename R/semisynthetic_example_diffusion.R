@@ -57,20 +57,37 @@ q.vec = c(0.05,0.005,0.0005) # fading diffusion faster than simple diffusion
 
 # public data
 
+on.cluster = T
+if(on.cluster){
+  hh_dat <- readRDS('data/hh_dat.rds')
+  network_set <- readRDS('data/network_set.rds')
+  cell_dat <- readRDS('data/cell_dat.rds')
+
+} else {
+
+  data.file.networks <- paste0("DoNotUpload/Network Data/Gossip Data/RFENetwork.mat")
+  # seed info
+  data.file.seed <- paste0("DoNotUpload/Network Data/Gossip Data/all_hh_data_18_Nov_2016_v9.dta")
+  data.file.cell <- paste0("DoNotUpload/Network Data/Gossip Data/karnataka_cell_rct.dta")
+  # All data in this case is from comparing to a randomly seeded example in the treatments.
+
+
+  hh_dat <- read_dta(data.file.seed) # no number 27
+  network_set <- readMat(data.file.networks)
+  cell_dat <- read_dta(data.file.cell) # no number 27
+
+  saveRDS(hh_dat, 'data/hh_dat.rds')
+  saveRDS(network_set, 'data/network_set.rds')
+  saveRDS(cell_dat, 'data/cell_dat.rds')
+}
 # real data networks
-data.file.networks <- paste0("DoNotUpload/Network Data/Gossip Data/RFENetwork.mat")
-
-# seed info
-data.file.seed <- paste0("DoNotUpload/Network Data/Gossip Data/all_hh_data_18_Nov_2016_v9.dta")
-
-data.file.cell <- paste0("DoNotUpload/Network Data/Gossip Data/karnataka_cell_rct.dta")
-# All data in this case is from comparing to a randomly seeded example in the treatments.
 
 
-hh_dat <- read_dta(data.file.seed) # no number 27
-network_set <- readMat(data.file.networks)
-cell_dat <- read_dta(data.file.cell) # no number 27
 
+
+
+
+print(colnames(hh_dat))
 
 
 village_dat = hh_dat %>% filter(villageid == block)
