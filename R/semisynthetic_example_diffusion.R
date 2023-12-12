@@ -144,10 +144,11 @@ n.sims =  500 # number of simulations per network
 
 # Only compare the full data and partial data versions
 n.methods = 3 # compare the alternative under SBM
-n.coefs = T.max + 2
-results <- array(NA, c(n.sims, n.methods, n.coefs))
-results_cover <- array(NA, c(n.sims, 3))
-results_se_length <- array(NA, c(n.sims, n.methods))
+
+# we only care about a single parameter of interest
+results <- array(NA, c(n.sims, n.methods))
+results_cover <- array(NA, c(n.sims, n.methods))
+results_sd <- array(NA, c(n.sims, n.methods))
 # Methods tuning parameters
 B.boot = 200
 
@@ -174,6 +175,7 @@ colnames(X_walk) = paste0("n", 0:3)
 #optimal.design.saturations <- matrix(nrow = 72, ncol = 6)
 optimal.design.saturations <- readRDS(file = 'data/optimal_design_saturations.rds')
 missing.row = sum(is.na(optimal.design.saturations[block,])) > 0
+missing.row = F
 if(missing.row){
   # optimal design seed example:
   library(rBayesianOptimization)
@@ -238,9 +240,9 @@ if(missing.row){
 
 
 
-
+# optimal design saturation level
 tau.opt = optimal.design.saturations[block,]
-A.opt.sat <- saturation_random_sample(tau, clusters)
+A.opt.sat <- saturation_random_sample(tau.opt, Z.true)
 
 
 
@@ -258,7 +260,7 @@ for(sim in seq(n.sims)){
   df.sim = DiffusionExample(G.true,A.seed,q.vec, alpha0 = alpha0, alpha1 = alpha1)
 
   data = X_walk
-  data$y = df.sim$Y
+  data$Y = df.sim$Y
 
   # Create a logistic regression based-diffusion model
   diff.model <- glm(fmla, data = data, family = "binomial")
@@ -317,16 +319,16 @@ for(sim in seq(n.sims)){
   df.sim.opt = DiffusionExample(G.true,A.opt.sat,q.vec, alpha0 = alpha0, alpha1 = alpha1)
 
 
-  X.samp.ard.opt = ARDDiffusionRegressionSim(A.opt.sat, P.hat, Z.hat, T.max = T.max, B.boot = B.boot, verbose = F)
+  X.mean.data.opt = ARDDiffusionRegressionSim(A.opt.sat, P.hat, Z.hat, T.max = T.max, B.boot = B.boot, verbose = F)
 
 
-  X.mean.data.opt = data.frame(meanOverList(X.samp.ard.opt$data))
+  X.mean.data.opt = data.frame(meanOverList(X.mean.data.opt$data))
 
   colnames(X.mean.data.opt) = paste0("n", 0:3)
   X.mean.data.opt$Y =  df.sim.opt$Y
 
   ard.mean.model.opt <- glm(fmla, data = X.mean.data.opt, family = "binomial")
-  print(ard.mean.model.opt)
+
 
   ard.coef.est.opt <- ard.mean.model.opt$coefficients
 
@@ -456,9 +458,6 @@ b.model$estimate()
 clust_bm_K = apply(b.model$memberships[[K]]$Z, 1,which.max)
 
 
-# TODO: remove the unnecessary statement here when done testing.
-#clust_bm_K <- c(1,rep(seq(1,nrow(G.true)/2), 2))
-#clust_bm_K[nrow(G.true)] = nrow(G.true) - 1
 
 # table(clust_bm_K)
 P.true <- b.model$model_parameters[[K]]$pi
