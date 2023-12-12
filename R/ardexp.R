@@ -267,3 +267,173 @@ linearOutcomeNormalizedByGroupNormalSim <- function(Z,G,a,betasZ,  beta.a, beta.
   Y = as.numeric(rnorm(n = n, mean = means, sd = noise))
   return(Y)
 }
+
+
+
+# Semisynthetic diffusion Example:
+DiffusionExample <- function(G, A, q.vec, alpha0 = -1, alpha1 = 3) {
+  T.max = length(q.vec)
+  n = length(A)
+  if(n != nrow(G)){
+    errorCondition('treatment seeds must match the vector G')
+  }
+  g = igraph::graph_from_adjacency_matrix(G, mode = 'undirected')
+  W.vec = A # initial seeds
+  for(t.step in seq(T.max)){
+    idx = which(W.vec > 0) # who is infected
+    q = q.vec[t.step]
+    # Gossip spread step
+    for(i in idx){
+      neighbour.set = unique(unlist(neighborhood(g, nodes = i)))
+      neighbour.set = sort(neighbour.set)
+      n.neighbours = length(neighbour.set)
+
+      neighbour.spread = rbinom(n.neighbours,1,q)
+      W.vec[neighbour.set[neighbour.spread == 1]] = W.vec[neighbour.set[neighbour.spread == 1]] + 1
+    }
+  }
+
+  prob = 1/(1 + exp(- alpha1*W.vec - alpha0))
+  Y.sim = rbinom(n = length(prob), size = 1, prob = prob)
+  return(data.frame("Y" = Y.sim,"W" = W.vec))
+}
+
+
+DiffusionExampleCovariates <- function(G,A, T.max = 3, divide.by.denom = F){
+  n = length(A)
+  if(n != nrow(G)){
+    errorCondition('treatment seeds must match the vector G')
+  }
+  G.power = diag(n)
+  X = matrix(nrow = n, ncol = T.max + 1)
+  for(t.step in seq(0,T.max)){
+
+    seed.neighbors = G.power %*% A
+    if(divide.by.denom){
+      denom = choose(n,t.step)
+
+    } else {
+      denom = 1
+    }
+    X[,t.step + 1] = as.numeric(seed.neighbors/denom)
+    G.power = G.power %*% G
+  }
+  X = data.frame(X)
+  return(X)
+}
+
+
+
+
+
+Generate_G_set <- function(P,Z, L = 1000){
+  G_set = list()
+  for(l in seq(L)) {
+    g.sim <- generateSBM(n,P,Z = Z)
+    G_set[[l]] = g.sim$G
+  }
+  return(G_set)
+}
+
+# SpilloverCovariates
+# P_mat = P.true
+# L = 200
+# G_set <- Generate_G_set(P.true,Z.true,L = 1000)
+
+
+
+saturation_random_sample <- function(tau,clusters){
+  n = length(clusters)
+  idx = seq(1:n)
+  A = rep(0,n)
+  K = length(tau)
+  for(k in seq(K)){
+    idx_k = idx[clusters == k]
+    n_k = length(idx_k)
+    n_samp_k = round(tau[k]*n_k)
+    idx_ak = sample(idx_k,n_samp_k,replace = F)
+    A[idx_ak] = 1
+  }
+  return(A)
+}
+
+
+# We simply have to define a function factory first.
+variance_function <- function(A,phi,G_set,clusters,regression_features, Sigma){
+  if(length(G_set) <= 1){
+    stop("G_set must have more than one sample")
+  }
+  F_mat = regression_features(G_set[[1]], A)
+  L = length(G_set)
+  for(l in seq(2,L)){
+    if(any(is.na(regression_features(G_set[[l]], A)))){
+      warning(paste0('index ', l, ' has an NA valued feature'))
+    }
+    F_mat = F_mat + regression_features(G_set[[l]], A)
+  }
+  n = nrow(F_mat)
+  F_mat = F_mat/L
+  F_mat$intercept = 1
+  F_mat = as.matrix(F_mat)
+  F_mat = F_mat
+  Sig_F = (t(F_mat) %*% F_mat)
+
+  # avoiding errors from non-invertible matrices.
+  if(min(eigen(Sig_F)$values) < 10**(-10)){
+    V_a = Inf
+  } else {
+    Sig_F_inv = solve(Sig_F)
+    V_a = as.numeric(t(phi) %*% Sig_F_inv %*% t(F_mat) %*% Sigma %*% F_mat%*% Sig_F_inv %*% phi)
+  }
+  return(V_a)
+}
+# We simply have to define a function factory first.
+variance_function <- function(A,phi,G_set,clusters,regression_features, Sigma){
+  if(length(G_set) <= 1){
+    stop("G_set must have more than one sample")
+  }
+  F_mat = regression_features(G_set[[1]], A)
+  L = length(G_set)
+  for(l in seq(2,L)){
+    if(any(is.na(regression_features(G_set[[l]], A)))){
+      print(l)
+    }
+    F_mat = F_mat + regression_features(G_set[[l]], A)
+  }
+  n = nrow(F_mat)
+  F_mat = F_mat/L
+  F_mat$intercept = 1
+  F_mat = as.matrix(F_mat)
+  F_mat = F_mat
+  Sig_F = (t(F_mat) %*% F_mat)
+
+  # avoiding errors from non-invertible matrices.
+  if(min(eigen(Sig_F)$values) < 10**(-10)){
+    V_a = Inf
+  } else {
+    Sig_F_inv = solve(Sig_F)
+    V_a = as.numeric(t(phi) %*% Sig_F_inv %*% t(F_mat) %*% Sigma %*% F_mat%*% Sig_F_inv %*% phi)
+  }
+  return(V_a)
+}
+
+variance_function_factory <- function(phi,G_set,clusters,regression_features, Sigma){
+  # force the input parameters so the Bayesian Optimization can be called
+  force(phi)
+  force(G_set)
+  force(clusters)
+  force(regression_features)
+  force(Sigma)
+
+  var_func <- function(tau){
+    A = saturation_random_sample(tau, clusters)
+    return( variance_function(A,phi,G_set,clusters,regression_features, Sigma))
+  }
+}
+
+
+
+
+
+
+

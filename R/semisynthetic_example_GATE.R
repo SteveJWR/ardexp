@@ -103,6 +103,10 @@ b.model$estimate()
 clust_bm_K = apply(b.model$memberships[[K]]$Z, 1,which.max)
 
 
+# TODO: remove the unnecessary statement here when done testing.
+#clust_bm_K <- c(1,rep(seq(1,nrow(G.true)/2), 2))
+#clust_bm_K[nrow(G.true)] = nrow(G.true) - 1
+
 # table(clust_bm_K)
 P.true <- b.model$model_parameters[[K]]$pi
 P.true = (P.true + t(P.true))/2
@@ -126,14 +130,14 @@ if(estimate.sbm){
 
 
 
-n.sims =  500 # number of simulations per network
+n.sims =  20 # number of simulations per network
 
 # Only compare the full data and partial data versions
 n.methods = 5
 results <- array(NA, c(n.sims, n.methods))
-results_cover <- array(NA, c(n.sims, 2))
+results_cover <- array(NA, c(n.sims, 3))
 # Methods tuning parameters
-B.boot = 200
+B.boot = 1000
 
 #### Simulations Start
 
@@ -176,12 +180,22 @@ for(sim in seq(n.sims)){
   X.data.0 <- data.frame("A" = rep(0,length(A.sat)), "frac.treated" = rep(0,length(A.sat)), "deg.ratio" = d.vec/d.mean)
   X.data.1 <- data.frame("A" = rep(1,length(A.sat)), "frac.treated" = rep(1,length(A.sat)), "deg.ratio" = d.vec/d.mean)
 
+  X.data.0$Y = Y.sat
+  X.data.1$Y = Y.sat
+
   y.0 <- predict(model, X.data.0)
   y.1 <- predict(model, X.data.1)
 
   # full data regression
   gate.est.regression <- mean((y.1 - y.0))
 
+  # Inference for GATE
+  phi = colMeans(model.matrix(fmla, X.data.1)) - colMeans(model.matrix(fmla, X.data.0))
+
+  Sigma <- sandwich::sandwich(model)
+  gate.var <- t(phi) %*% Sigma %*% phi
+  sd.gate.full.data = sqrt(gate.var)
+  cover.full.data <- abs(true.gate - gate.est.regression)/sd.gate.full.data <= 1.96
 
   # Here we are asking about the traits directly for simplicity in the simulations.
 
@@ -224,11 +238,10 @@ for(sim in seq(n.sims)){
 
   gate.var <- t(phi) %*% Sigma %*% phi
   sd.gate = sqrt(gate.var)
-  graph.sample.var <- sqrt(meanOverList((unlist(res.ard$gate)- mean(unlist(res.ard$gate)))**2))
+  graph.sample.sd <- sqrt(meanOverList((unlist(res.ard$gate)- mean(unlist(res.ard$gate)))**2))
 
   cover <- abs(true.gate - gate.ard.est)/sd.gate <= 1.96
-  cover.model.sample <- abs(true.gate - gate.ard.est)/sqrt(sd.gate**2 + graph.sample.var**2) <= 1.96
-
+  cover.model.sample <- abs(true.gate - gate.ard.est)/sqrt(sd.gate**2 + graph.sample.sd**2) <= 1.96
 
   # 'True' MODEL GATE
 
@@ -265,7 +278,7 @@ for(sim in seq(n.sims)){
                DM.est - outcome.cluster.treat$GATE,
                HT.est - outcome.cluster.treat$GATE)
 
-  cover.vec <- c(cover[1,1],cover.model.sample[1,1])
+  cover.vec <- c(cover[1,1],cover.model.sample[1,1], cover.full.data[1,1])
 
 
 
@@ -281,6 +294,7 @@ colnames(results) = c("ard",
                       "reg",
                       "DM",
                       "HT")
+
 colnames(results_cover) = c("cover asymptotic",
                             "cover asymptotic + model sample")
 
@@ -294,7 +308,6 @@ filename_coverage <- paste0("data/JPAL_sim_results/GATE_JPAL_village_",block,"_K
 
 saveRDS(results_cover, filename_coverage)
 
-#
 
 ### Plotting for debugging
 # plot(g, vertex.color=Z.true, vertex.label = NA)

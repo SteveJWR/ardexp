@@ -301,7 +301,6 @@ ARDUganderSBMLinearRegressionSim <- function(Y,fmla, A, H, P, Z, B.boot = 200, v
   A.0 <- rep(0,n)
   A.1 <- rep(1,n)
   coef.list <- list()
-  # almost certainly we should use a robust variance here
   var.list <- list()
   data.list <- list()
   gate.list <- list()
@@ -341,12 +340,37 @@ ARDUganderSBMLinearRegressionSim <- function(Y,fmla, A, H, P, Z, B.boot = 200, v
 }
 
 
+ARDDiffusionRegressionSim <- function(A, P, Z, T.max = 3, B.boot = 200, verbose = F){
+
+  coef.list <- list()
+  var.list <- list()
+  data.list <- list()
+  gate.list <- list()
+  for(b in seq(B.boot)){
+    if (verbose) {
+      m1 = (round(20 * b/B.boot))
+      m2 = 20 - m1
+      progress.bar = paste0("|", strrep("=", m1), strrep("-",
+                                                         m2), "|")
+      cat(paste0("Resample:", b, "/", B.boot, "  ", progress.bar),
+          end = "\r")
+    }
+    g.sim <- generateSBM(n,P,Z = Z)
+    G = g.sim$G
+    data <- DiffusionExampleCovariates(G,A, T.max = T.max)
+    data.list[[b]] <- data
+  }
+
+  return(list( "data" = data.list))
+}
+
+
 ARDSBMSpilloverLinearRegressionSim <- function(Y,fmla, graphMapping, A, P, Z, B.boot = 200, verbose = F){
   n = length(Y)
   A.0 <- rep(0,n)
   A.1 <- rep(1,n)
   coef.list <- list()
-  # almost certainly we should use a robust variance here
+
   var.list <- list()
   data.list <- list()
   gate.list <- list()
