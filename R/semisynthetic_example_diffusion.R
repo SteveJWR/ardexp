@@ -11,6 +11,9 @@ library(igraph)
 library(blockmodels)
 library(sandwich)
 
+library(haven)
+library(R.matlab)
+
 
 
 slurm_arrayid <- Sys.getenv('SLURM_ARRAY_TASK_ID')
