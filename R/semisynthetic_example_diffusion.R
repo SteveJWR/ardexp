@@ -1,4 +1,3 @@
-
 rm(list = ls())
 
 source("R/ardexp.R") # functions for the main
@@ -48,7 +47,10 @@ K = 6
 # True model parameters
 alpha0 = -1
 alpha1 = 1
-p.vec = c(0.05,0.005,0.0005) # fading diffusion faster than simple diffusion
+T.max = 3
+q.vec = c(0.05,0.005,0.0005) # fading diffusion faster than simple diffusion
+
+
 
 # public data
 
@@ -63,8 +65,10 @@ data.file.cell <- paste0("DoNotUpload/Network Data/Gossip Data/karnataka_cell_rc
 
 
 hh_dat <- haven::read_dta(data.file.seed) # no number 27
-graphs <- R.matlab::readMat(data.file.networks)
+network_set <- R.matlab::readMat(data.file.networks)
 cell_dat <- haven::read_dta(data.file.cell) # no number 27
+
+
 
 village_dat = hh_dat %>% filter(villageid == block)
 seeds  <- village_dat$seed_dummy
@@ -73,7 +77,7 @@ seeds  <- village_dat$seed_dummy
 
 
 
-graphs = graphs$Z[[block]][[1]]
+graphs = network_set$Z[[block]][[1]]
 views = length(graphs)
 G = NULL
 for (view in seq(views)){
@@ -172,6 +176,18 @@ optimal.design.saturations <- readRDS(file = 'data/optimal_design_saturations.rd
 missing.row = sum(is.na(optimal.design.saturations[block,])) > 0
 if(missing.row){
   # optimal design seed example:
+  library(rBayesianOptimization)
+
+  # Assuming For simplicity, K is known.
+  k.means.model <- clusterARDKmeans(X,K)
+
+  Z.hat = k.means.model$cluster
+  #
+  Z.hat = labelSwitching(Z.true,Z.hat)
+
+  Z.hat = Z.true # true clusters known
+  # estimate
+  P.hat <- estimatePmatARD(Z.hat, X)
 
   G_set <- Generate_G_set(P.hat, Z.hat, L = 100)
 
@@ -204,12 +220,17 @@ if(missing.row){
                             tau6 = runif(20,0,1)
   )
 
-  bayes_opt_variance <- BayesianOptimization(FUN = Bayesopt_obj, bounds = search_bound,
-                                             init_grid_dt = search_grid, init_points = 0,
-                                             n_iter = 25, acq = 'ei')
+
+  an.error.occured <- c()
+  tryCatch( { bayes_opt_variance <- BayesianOptimization(FUN = Bayesopt_obj, bounds = search_bound,
+                                                         init_grid_dt = search_grid, init_points = 0,
+                                                         n_iter = 25, acq = 'ei'); }
+            , error = function(e) {an.error.occured <<- c(an.error.occured, block)})
+  print(an.error.occured)
+
   optimal.design.saturations[block,] = as.numeric(bayes_opt_variance$Best_Par)
   saveRDS(optimal.design.saturations, file = 'data/optimal_design_saturations.rds')
-
+  print(paste0("Block ", block, ' of 72 complete'))
 }
 
 
@@ -217,7 +238,7 @@ if(missing.row){
 
 
 
-clusters = Z.true
+
 tau.opt = optimal.design.saturations[block,]
 A.opt.sat <- saturation_random_sample(tau, clusters)
 
