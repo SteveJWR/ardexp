@@ -19,7 +19,7 @@ library(R.matlab)
 slurm_arrayid <- Sys.getenv('SLURM_ARRAY_TASK_ID')
 print(Sys.getenv('SLURM_ARRAY_TASK_ID'))
 if(slurm_arrayid == ""){
-  id = 1
+  id = 68
 } else {
   # coerce the value to an integer
   id <- as.numeric(slurm_arrayid) # for zero indexing
@@ -62,10 +62,12 @@ if(on.cluster){
   hh_dat <- readRDS('data/hh_dat.rds')
   network_set <- readRDS('data/network_set.rds')
   cell_dat <- readRDS('data/cell_dat.rds')
+  vertex_key <- readRDS('data/vertex_key.rds')
 
 } else {
 
   data.file.networks <- paste0("DoNotUpload/Network Data/Gossip Data/RFENetwork.mat")
+  data.file.vertex_key <- paste0("DoNotUpload/Network Data/Gossip Data/vertex_key.mat")
   # seed info
   data.file.seed <- paste0("DoNotUpload/Network Data/Gossip Data/all_hh_data_18_Nov_2016_v9.dta")
   data.file.cell <- paste0("DoNotUpload/Network Data/Gossip Data/karnataka_cell_rct.dta")
@@ -74,10 +76,12 @@ if(on.cluster){
 
   hh_dat <- read_dta(data.file.seed) # no number 27
   network_set <- readMat(data.file.networks)
+  vertex_key <- readMat(data.file.vertex_key)
   cell_dat <- read_dta(data.file.cell) # no number 27
 
   saveRDS(hh_dat, 'data/hh_dat.rds')
   saveRDS(network_set, 'data/network_set.rds')
+  saveRDS(vertex_key, 'data/vertex_key.rds')
   saveRDS(cell_dat, 'data/cell_dat.rds')
 }
 # real data networks
@@ -91,8 +95,15 @@ print(colnames(hh_dat))
 
 
 village_dat = hh_dat[hh_dat$villageid == block,]
-seeds  <- village_dat$seed_dummy
+seeds_village_hhid = village_dat$hhid[village_dat$seed_dummy == 1]
 
+
+# which seeds were actually treated
+village_key <- vertex_key$vertex.to.hhid.key[[block]][[1]]
+seeds <- rep(0,nrow(village_key))
+
+seed_idx = village_key[village_key[,2] %in% seeds_village_hhid,1]
+seeds[seed_idx] = 1
 ## Simulations to compare the full data and spillover parameters
 
 
