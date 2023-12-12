@@ -67,9 +67,9 @@ data.file.cell <- paste0("DoNotUpload/Network Data/Gossip Data/karnataka_cell_rc
 # All data in this case is from comparing to a randomly seeded example in the treatments.
 
 
-hh_dat <- haven::read_dta(data.file.seed) # no number 27
-network_set <- R.matlab::readMat(data.file.networks)
-cell_dat <- haven::read_dta(data.file.cell) # no number 27
+hh_dat <- read_dta(data.file.seed) # no number 27
+network_set <- readMat(data.file.networks)
+cell_dat <- read_dta(data.file.cell) # no number 27
 
 
 
