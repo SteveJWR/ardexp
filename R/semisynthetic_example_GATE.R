@@ -102,18 +102,12 @@ b.model <- BM_bernoulli(membership_type = 'SBM_sym', adj = G.true, explore_min =
 b.model$estimate()
 clust_bm_K = apply(b.model$memberships[[K]]$Z, 1,which.max)
 
-
-# TODO: remove the unnecessary statement here when done testing.
-#clust_bm_K <- c(1,rep(seq(1,nrow(G.true)/2), 2))
-#clust_bm_K[nrow(G.true)] = nrow(G.true) - 1
-
-# table(clust_bm_K)
 P.true <- b.model$model_parameters[[K]]$pi
 P.true = (P.true + t(P.true))/2
 
 estimate.sbm <- T
 if(estimate.sbm){
-  #sbm.true <- sbm::estimateSimpleSBM(G)
+  #sbm.true <- sbm::estimateSimpleSBM(G.true)
 
   # all we need are the "true clusters"
   Z.true <- clust_bm_K
@@ -130,12 +124,12 @@ if(estimate.sbm){
 
 
 
-n.sims =  20 # number of simulations per network
+n.sims =  50 # number of simulations per network
 
 # Only compare the full data and partial data versions
 n.methods = 5
 results <- array(NA, c(n.sims, n.methods))
-results_cover <- array(NA, c(n.sims, 3))
+results_cover <- array(NA, c(n.sims, 2))
 # Methods tuning parameters
 B.boot = 1000
 
@@ -154,12 +148,18 @@ n = nrow(G.true)
 K = max(Z.true) # number of true clusters
 H <- simH(Z.true)
 for(sim in seq(n.sims)){
+  set.seed(sim)
   cat(paste0("Sim: ", sim, "/", n.sims), end = "\r")
 
   # whether to do binomial randomization or the true cluster treatment
   K.high.level <- round(sat.frac*K)
   K.low.level <- K - K.high.level
-  clust.levels <- c(rep(p.high.level, K.high.level), rep(p.low.level, K.low.level))
+  #clust.levels <- c(rep(p.high.level, K.high.level), rep(p.low.level, K.low.level))
+  diag.clusters = diag(P.true)
+  clust.levels <- rep(c(p.high.level,p.low.level),times = K)
+  clust.levels = clust.levels[1:K]
+  clust.levels <- clust.levels[order(diag.clusters)]
+
   A.sat <- saturationRandomizationTreatment(Z.true, levels = clust.levels)
 
   #outcome.sat <- simSpilloverModelOutcomes(G.true,A.sat,a = a, b = b, delta = delta, gamma0 = gamma0, gamma1 = gamma1, sigma = sigma)
@@ -167,6 +167,7 @@ for(sim in seq(n.sims)){
 
   Y.sat <- outcome.sat$Y
   true.gate = outcome.sat$GATE
+  # print(true.gate)
 
   d.vec = as.numeric(G.true %*% rep(1,n))
   d.mean = mean(d.vec)
@@ -207,7 +208,7 @@ for(sim in seq(n.sims)){
   #
   Z.hat = labelSwitching(Z.true,Z.hat)
 
-  Z.hat = Z.true # true clusters known
+  # Z.hat = Z.true # true clusters known
   # estimate
   P.hat <- estimatePmatARD(Z.hat, X)
 
@@ -238,15 +239,13 @@ for(sim in seq(n.sims)){
 
   gate.var <- t(phi) %*% Sigma %*% phi
   sd.gate = sqrt(gate.var)
-  graph.sample.sd <- sqrt(meanOverList((unlist(res.ard$gate)- mean(unlist(res.ard$gate)))**2))
+  # graph.sample.sd <- sqrt(meanOverList((unlist(res.ard$gate)- mean(unlist(res.ard$gate)))**2))
 
   cover <- abs(true.gate - gate.ard.est)/sd.gate <= 1.96
-  cover.model.sample <- abs(true.gate - gate.ard.est)/sqrt(sd.gate**2 + graph.sample.sd**2) <= 1.96
+  # cover.model.sample <- abs(true.gate - gate.ard.est)/sqrt(sd.gate**2 + graph.sample.sd**2) <= 1.96
 
   # 'True' MODEL GATE
-
   res.ard <- ARDUganderSBMLinearRegressionSim(Y.sat, fmla,  A.sat, H, P.hat,Z.hat, B.boot = B.boot, verbose = T)
-
   mean.data = meanOverList(res.ard$data)
   ard.mean.model <- lm(fmla, data = mean.data)
 
@@ -278,7 +277,7 @@ for(sim in seq(n.sims)){
                DM.est - outcome.cluster.treat$GATE,
                HT.est - outcome.cluster.treat$GATE)
 
-  cover.vec <- c(cover[1,1],cover.model.sample[1,1], cover.full.data[1,1])
+  cover.vec <- c(cover[1,1], cover.full.data[1,1])
 
 
 
@@ -288,6 +287,9 @@ for(sim in seq(n.sims)){
   results[sim,] <- res.vec
   results_cover[sim,] <- cover.vec
 }
+# TODO: Problems seem to arize in the extreme values, there are seemingly sometimes occurances when the ARD estimate is way off =
+# results_cover_subset = results_cover[abs(results[,1]) < 3,]
+# colMeans(results_cover_subset)
 
 colnames(results) = c("ard",
                       "ard.tm",
@@ -296,7 +298,7 @@ colnames(results) = c("ard",
                       "HT")
 
 colnames(results_cover) = c("cover asymptotic",
-                            "cover asymptotic + model sample")
+                            "cover full data")
 
 print(colMeans(round(results,6)))
 

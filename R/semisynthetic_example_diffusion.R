@@ -90,7 +90,6 @@ if(on.cluster){
 
 
 
-
 print(colnames(hh_dat))
 
 
@@ -134,7 +133,7 @@ G <- G + t(G)
 G[G > 0] = 1
 G.true <- G
 
-g <- graph_from_adjacency_matrix(G.true, mode = "undirected")
+# g <- graph_from_adjacency_matrix(G.true, mode = "undirected")
 # remove unconnected individuals
 idx = which(colSums(G.true) > 0)
 G.true = G.true[idx,idx]
@@ -142,15 +141,16 @@ seeds.true = seeds[idx]
 g <- graph_from_adjacency_matrix(G.true, mode = "undirected")
 
 
+# TODO: Updated using the Leiden Method
 ## Stochastic block-model clustering,
-b.model <- BM_bernoulli(membership_type = 'SBM_sym', adj = G.true, explore_min = K.max, explore_max = K.max)
-b.model$estimate()
-clust_bm_K = apply(b.model$memberships[[K]]$Z, 1,which.max)
-
+# b.model <- BM_bernoulli(membership_type = 'SBM_sym', adj = G.true, explore_min = K.max, explore_max = K.max)
+# b.model$estimate()
+# clust_bm_K = apply(b.model$memberships[[K]]$Z, 1,which.max)
+clust_bm_K = cluster_leiden_K(G.true, K = K)
 
 # table(clust_bm_K)
-P.true <- b.model$model_parameters[[K]]$pi
-P.true = (P.true + t(P.true))/2
+# P.true <- b.model$model_parameters[[K]]$pi
+# P.true = (P.true + t(P.true))/2
 
 estimate.sbm <- T
 if(estimate.sbm){
@@ -169,8 +169,6 @@ if(estimate.sbm){
 # Think of a second version of the simulation where there is a competitive advantage to treatment
 # but that wears off if everyone else around you has it
 
-
-
 n.sims =  500 # number of simulations per network
 
 # Only compare the full data and partial data versions
@@ -180,8 +178,10 @@ n.methods = 3 # compare the alternative under SBM
 results <- array(NA, c(n.sims, n.methods))
 results_cover <- array(NA, c(n.sims, n.methods))
 results_sd <- array(NA, c(n.sims, n.methods))
+results_all_params <- array(NA, c(n.sims, n.methods))
+
 # Methods tuning parameters
-B.boot = 200
+B.boot = 1000 # 200 # number of bootstrap samples
 
 #### Simulations Start
 
@@ -196,6 +196,9 @@ true.coefficients <- c(-alpha0,alpha1,alpha1*c(q.vec[1], q.vec[1]*q.vec[2], q.ve
 n = nrow(G.true)
 K = max(Z.true) # number of true clusters
 
+T.max = length(q.vec)
+
+
 
 A.seed <- as.numeric(seeds.true)
 # random walk coefficients
@@ -204,6 +207,7 @@ X_walk <- as.data.frame(X_walk)
 colnames(X_walk) = paste0("n", 0:3)
 
 #optimal.design.saturations <- matrix(nrow = 72, ncol = 6)
+# Precomputed saturations levels for each of the relevant clusters
 optimal.design.saturations <- readRDS(file = 'data/optimal_design_saturations.rds')
 missing.row = sum(is.na(optimal.design.saturations[block,])) > 0
 missing.row = F
@@ -218,7 +222,7 @@ if(missing.row){
   #
   Z.hat = labelSwitching(Z.true,Z.hat)
 
-  Z.hat = Z.true # true clusters known
+  # Z.hat = Z.true # true clusters known
   # estimate
   P.hat <- estimatePmatARD(Z.hat, X)
 
@@ -271,7 +275,7 @@ if(missing.row){
 
 
 
-# optimal design saturation level
+# optimal design saturation levels from the precomputed levels.
 tau.opt = optimal.design.saturations[block,]
 A.opt.sat <- saturation_random_sample(tau.opt, Z.true)
 
@@ -372,7 +376,7 @@ for(sim in seq(n.sims)){
   cover.ard.opt <- abs(alpha1 - ard.coef.est.opt[2])/sd.alpha1.ard.opt <= 1.96
 
   sd.length.ard = sd.alpha1.ard
-  results.diff.ard  <- ard.coef.est - true.coefficients
+  results.diff.ard.opt  <- ard.coef.est.opt - true.coefficients
 
 
 
@@ -382,10 +386,13 @@ for(sim in seq(n.sims)){
                ard.coef.est.opt[2] - alpha1,
                coef.est[2] - alpha1)
 
-  cover.vec <- c( cover.ard.opt[1,1],cover.full.data[1,1],cover.ard[1,1])
+  cover.vec <- c(cover.ard.opt[1,1],cover.full.data[1,1],cover.ard[1,1])
 
   sd.vec <-  c(sd.alpha1.ard,sd.alpha1.ard.opt,sd.alpha1.full.data)
 
+  res.vec.2norm <- c(sqrt(sum((ard.coef.est - true.coefficients)**2)),
+                     sqrt(sum((ard.coef.est.opt - true.coefficients)**2)),
+                     sqrt(sum((coef.est - true.coefficients)**2)))
 
 
   names(res.vec) = NULL
@@ -394,6 +401,7 @@ for(sim in seq(n.sims)){
   results[sim,] <- res.vec
   results_cover[sim,] <- cover.vec
   results_sd[sim, ] <- sd.vec
+  results_all_params[sim,] <- res.vec.2norm
 }
 
 colnames(results) = c("ard",
@@ -408,22 +416,23 @@ colnames(results_sd) = c("ard",
                          "ard.opt",
                          "reg.full.data")
 
+colnames(results_all_params) = c("ard",
+                         "ard.opt",
+                         "reg.full.data")
 
-print(colMeans(round(results,6)))
+
 
 filename <- paste0("data/Gossip_sim_results/Gossip_village_",block,"_diff.rds")
-print(colMeans(round(results,6)))
-
 saveRDS(results, filename)
 
 filename_coverage <- paste0("data/Gossip_sim_results/Gossip_village_",block,"_coverage.rds")
-
 saveRDS(results_cover, filename_coverage)
 
 filename_sd <- paste0("data/Gossip_sim_results/Gossip_village_",block,"_sd.rds")
-
 saveRDS(results_sd, filename_sd)
 
+filename_all_params <- paste0("data/Gossip_sim_results/Gossip_village_",block,"_all_params.rds")
+saveRDS(results_all_params, filename_all_params)
 
 
 

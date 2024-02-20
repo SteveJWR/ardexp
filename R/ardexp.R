@@ -9,10 +9,15 @@ library(sandwich)
 
 
 
+#TODO: We can include all of the relevant functions in a single script.
+# We can later turn this into a package once we are happy with the relevant documentation
+
+
+# simulating an SBM f
 generateSBM <- function(n,P,PI,Z){
   if(missing(Z)){
     if(nrow(P) != ncol(P)){
-      stop("P must be symmetric")
+      stop("P must be square")
     }
     if(sum(abs(P  - t(P))) > 0.01){
       stop("P must be symmetric")
@@ -59,16 +64,16 @@ generateSBM <- function(n,P,PI,Z){
 }
 
 
-traitsSample <- function(Z,Q){
-  n = length(Z)
-  traits.vec = rep(NA, n)
-  Tr = nrow(Q)
-  for(i in seq(n)){
-    trait = sample(seq(Tr), size = 1, prob = Q[,Z[i]])
-    traits.vec[i] = trait
-  }
-  return(traits.vec)
-}
+# traitsSample <- function(Z,Q){
+#   n = length(Z)
+#   traits.vec = rep(NA, n)
+#   Tr = nrow(Q)
+#   for(i in seq(n)){
+#     trait = sample(seq(Tr), size = 1, prob = Q[,Z[i]])
+#     traits.vec[i] = trait
+#   }
+#   return(traits.vec)
+# }
 
 
 computeARD <- function(traits.vec, G){
@@ -165,18 +170,18 @@ estimatePmatARD <- function(Z.hat, X){
 
 
 
-linearOutcomeNormalSim <- function(Z,G,a,betasZ,  beta.a, beta.dtau,  noise = 1){
-  d.tau = as.numeric(G %*% a) # number of treated neighbours
-  K = max(Z)
-  n = length(Z)
-  Z.df = data.frame("z" = factor(Z, levels = seq(K)))
-  dmy <- dummyVars(" ~ .", data = Z.df)
-  Z.oh <- data.frame(predict(dmy, newdata = Z.df))
-  Z.oh <- as.matrix(Z.oh)
-  means = Z.oh %*% betasZ + beta.a *a + beta.dtau * d.tau
-  Y = as.numeric(rnorm(n = n, mean = means, sd = noise))
-  return(Y)
-}
+# linearOutcomeNormalSim <- function(Z,G,a,betasZ,  beta.a, beta.dtau,  noise = 1){
+#   d.tau = as.numeric(G %*% a) # number of treated neighbours
+#   K = max(Z)
+#   n = length(Z)
+#   Z.df = data.frame("z" = factor(Z, levels = seq(K)))
+#   dmy <- dummyVars(" ~ .", data = Z.df)
+#   Z.oh <- data.frame(predict(dmy, newdata = Z.df))
+#   Z.oh <- as.matrix(Z.oh)
+#   means = Z.oh %*% betasZ + beta.a *a + beta.dtau * d.tau
+#   Y = as.numeric(rnorm(n = n, mean = means, sd = noise))
+#   return(Y)
+# }
 
 
 
@@ -200,31 +205,31 @@ treatmentAssignment <- function(Z,prob){
 }
 
 
-estimateQ <- function(traits, Z){
-  Tr = max(traits)
-  K = max(Z)
-  Q = matrix(nrow = Tr, ncol = K)
-  for(k in seq(K)){
-    nc = sum(Z == k)
-    for(tr in seq(Tr)){
-      Q[tr,k] = sum(traits == tr & Z == k)/nc
-    }
-  }
-  return(Q)
-}
-
-reverseConditionalQ <- function(traits, Z){
-  Tr = max(traits)
-  K = max(Z)
-  Q = matrix(nrow = K, ncol = Tr)
-  for(tr in seq(Tr)){
-    nt = sum(traits == tr)
-    for(k in seq(K)){
-      Q[k,tr] = sum(traits == tr & Z == k)/nt
-    }
-  }
-  return(Q)
-}
+# estimateQ <- function(traits, Z){
+#   Tr = max(traits)
+#   K = max(Z)
+#   Q = matrix(nrow = Tr, ncol = K)
+#   for(k in seq(K)){
+#     nc = sum(Z == k)
+#     for(tr in seq(Tr)){
+#       Q[tr,k] = sum(traits == tr & Z == k)/nc
+#     }
+#   }
+#   return(Q)
+# }
+#
+# reverseConditionalQ <- function(traits, Z){
+#   Tr = max(traits)
+#   K = max(Z)
+#   Q = matrix(nrow = K, ncol = Tr)
+#   for(tr in seq(Tr)){
+#     nt = sum(traits == tr)
+#     for(k in seq(K)){
+#       Q[k,tr] = sum(traits == tr & Z == k)/nt
+#     }
+#   }
+#   return(Q)
+# }
 
 
 # label swapping for when classification is good
@@ -235,39 +240,41 @@ labelSwitching <- function(Z,Z.hat){
 }
 
 
-linearOutcomeNormalizedNormalSim <- function(Z,G,a,betasZ,  beta.a, beta.dtau,  noise = 1){
-  d.tau = as.numeric(G %*% a) # number of treated neighbours
-  d.vec = colSums(G)
+# linearOutcomeNormalizedNormalSim <- function(Z,G,a,betasZ,  beta.a, beta.dtau,  noise = 1){
+#   d.tau = as.numeric(G %*% a) # number of treated neighbours
+#   d.vec = colSums(G)
+#
+#   K = max(Z)
+#   n = length(Z)
+#   Z.df = data.frame("z" = factor(Z, levels = seq(K)))
+#   dmy <- dummyVars(" ~ .", data = Z.df)
+#   Z.oh <- data.frame(predict(dmy, newdata = Z.df))
+#   Z.oh <- as.matrix(Z.oh)
+#   means = Z.oh %*% betasZ + beta.a *a + beta.dtau * (d.tau/d.vec)
+#   Y = as.numeric(rnorm(n = n, mean = means, sd = noise))
+#   return(Y)
+# }
+#
+#
+# linearOutcomeNormalizedByGroupNormalSim <- function(Z,G,a,betasZ,  beta.a, beta.dtau,  noise = 1){
+#
+#   d.tau = as.numeric(G %*% a) # number of treated neighbours
+#
+#   d.vec = colSums(G)
+#
+#   K = max(Z)
+#   n = length(Z)
+#   Z.df = data.frame("z" = factor(Z, levels = seq(K)))
+#   dmy <- dummyVars(" ~ .", data = Z.df)
+#   Z.oh <- data.frame(predict(dmy, newdata = Z.df))
+#   Z.oh <- as.matrix(Z.oh)
+#   means = Z.oh %*% betasZ + beta.a *a + beta.dtau * (d.tau/d.vec)
+#   Y = as.numeric(rnorm(n = n, mean = means, sd = noise))
+#   return(Y)
+# }
 
-  K = max(Z)
-  n = length(Z)
-  Z.df = data.frame("z" = factor(Z, levels = seq(K)))
-  dmy <- dummyVars(" ~ .", data = Z.df)
-  Z.oh <- data.frame(predict(dmy, newdata = Z.df))
-  Z.oh <- as.matrix(Z.oh)
-  means = Z.oh %*% betasZ + beta.a *a + beta.dtau * (d.tau/d.vec)
-  Y = as.numeric(rnorm(n = n, mean = means, sd = noise))
-  return(Y)
-}
 
-
-linearOutcomeNormalizedByGroupNormalSim <- function(Z,G,a,betasZ,  beta.a, beta.dtau,  noise = 1){
-
-  d.tau = as.numeric(G %*% a) # number of treated neighbours
-
-  d.vec = colSums(G)
-
-  K = max(Z)
-  n = length(Z)
-  Z.df = data.frame("z" = factor(Z, levels = seq(K)))
-  dmy <- dummyVars(" ~ .", data = Z.df)
-  Z.oh <- data.frame(predict(dmy, newdata = Z.df))
-  Z.oh <- as.matrix(Z.oh)
-  means = Z.oh %*% betasZ + beta.a *a + beta.dtau * (d.tau/d.vec)
-  Y = as.numeric(rnorm(n = n, mean = means, sd = noise))
-  return(Y)
-}
-
+## Diffusion Example Functions
 
 
 # Semisynthetic diffusion Example:
@@ -279,18 +286,22 @@ DiffusionExample <- function(G, A, q.vec, alpha0 = -1, alpha1 = 3) {
   }
   g = igraph::graph_from_adjacency_matrix(G, mode = 'undirected')
   W.vec = A # initial seeds
+  infected_last_round = which(A > 0) # only spread if they were infected the previous round
   for(t.step in seq(T.max)){
-    idx = which(W.vec > 0) # who is infected
+    idx = infected_last_round # who is infected
     q = q.vec[t.step]
     # Gossip spread step
+    idx_next = c()
     for(i in idx){
       neighbour.set = unique(unlist(neighborhood(g, nodes = i)))
       neighbour.set = sort(neighbour.set)
       n.neighbours = length(neighbour.set)
 
       neighbour.spread = rbinom(n.neighbours,1,q)
+      idx_next = c(idx_next,neighbour.set[neighbour.spread == 1])
       W.vec[neighbour.set[neighbour.spread == 1]] = W.vec[neighbour.set[neighbour.spread == 1]] + 1
     }
+    infected_last_round = idx_next
   }
 
   prob = 1/(1 + exp(- alpha1*W.vec - alpha0))
@@ -299,6 +310,7 @@ DiffusionExample <- function(G, A, q.vec, alpha0 = -1, alpha1 = 3) {
 }
 
 
+# Expected number of neighbours in each case
 DiffusionExampleCovariates <- function(G,A, T.max = 3, divide.by.denom = F){
   n = length(A)
   if(n != nrow(G)){
@@ -340,7 +352,7 @@ Generate_G_set <- function(P,Z, L = 1000){
 # L = 200
 # G_set <- Generate_G_set(P.true,Z.true,L = 1000)
 
-
+## Bayesian Optimization
 
 saturation_random_sample <- function(tau,clusters){
   n = length(clusters)

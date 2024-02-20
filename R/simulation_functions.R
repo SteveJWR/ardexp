@@ -1,4 +1,7 @@
 
+# Here we have examples of the various outcome models for each of the models.
+
+
 
 ### replication of the simple Ugander response model
 simUganderModelOutcomes <- function(G,H,A, a = 1, b = 2, delta = 1, gamma = 1, sigma = 1) {
@@ -58,8 +61,8 @@ oneHopClustering <- function(G,w = rep(nrow(G),nrow(G)), verbose = F){
   }
 }
 
-# z.vec is the cluster vector
-simH <- function(z.vec, sigma.within = 1, sigma.between = 5){
+
+simH <- function(z.vec, sigma.within = 0.5, sigma.between = 2){
   unique.clusters <- unique(z.vec)
   K <- length(unique.clusters)
   H.block <- rnorm(K, sd = sigma.between)
@@ -230,6 +233,15 @@ meanOverList <- function(lst){
   return((1/B)*obj)
 }
 
+concatenateOverList <- function(lst){
+  obj <- lst[[1]]
+  B = length(lst)
+  for(b in seq(2,B)){
+    obj <- cbind(obj,lst[[b]])
+  }
+  return(obj)
+}
+
 varOverList <- function(lst){
   mean.obj <- meanOverList(lst)
   B = length(lst)
@@ -246,7 +258,7 @@ varOverList <- function(lst){
 
 
 # The user should be able to define their own functions
-# H is a good variable for covariates here.
+# H is a variable for covariates here.
 UganderCovariates <- function(G,H,A){
   n = nrow(G)
   d.vec = as.numeric(G %*% rep(1,n))
@@ -364,6 +376,69 @@ ARDDiffusionRegressionSim <- function(A, P, Z, T.max = 3, B.boot = 200, verbose 
   return(list( "data" = data.list))
 }
 
+# Here we use a simple linear model for maximizing over the treatment assignments.
+ExampleLinearModelCovariates <- function(G,A) {
+  n = nrow(G)
+  d.vec = as.numeric(G %*% rep(1,n))
+  f <- fracTreated(G,A)
+  G2 = G %*% G
+  f2 = fracTreated(G2,A)
+
+  f[is.na(f)] = 0 # no neighbors means none are treated
+  f2[is.na(f2)] = 0 # no neighbors means none are treated
+  cov.data <- data.frame("A" = A,
+                         "frac.treated" = f,
+                         "frac.treated.A0" = f*(1 - A),
+                         "frac.treated.second" = f2,
+                         "degree" = d.vec)
+}
+
+simExampleLinearModelOutcomes <- function(G,A,a = 1,delta = 1,gamma = 0.5, gamma2 = -0.5, sigma = 1) {
+  n = nrow(G)
+  eps <- rnorm(n)
+  f = fracTreated(G,A)
+  G2 = G %*% G
+  f2 = fracTreated(G2,A)
+
+  f[is.na(f)] = 0 # no neighbors means none are treated
+  f2[is.na(f2)] = 0 # no neighbors means none are treated
+  Y <- a + delta*A + gamma*f + gamma2*f2 + sigma*eps
+  meanY <- a + delta*A + gamma*f + gamma2*f2
+  return(list("Y" = Y, "meanY" = meanY))
+}
+
+ARDExampleLinearModelSim <- function(Y,fmla, A, P, Z, B.boot = 200, verbose = F){
+  n = length(Y)
+  A.0 <- rep(0,n)
+  A.1 <- rep(1,n)
+  coef.list <- list()
+  var.list <- list()
+  data.list <- list()
+  gate.list <- list()
+  for(b in seq(B.boot)){
+    if (verbose) {
+      m1 = (round(20 * b/B.boot))
+      m2 = 20 - m1
+      progress.bar = paste0("|", strrep("=", m1), strrep("-",
+                                                         m2), "|")
+      cat(paste0("Resample:", b, "/", B.boot, "  ", progress.bar),
+          end = "\r")
+    }
+    g.sim <- generateSBM(n,P,Z = Z)
+    G = g.sim$G
+    data <- ExampleLinearModelCovariates(G,A)
+    data$Y <- Y # adding the outcome
+
+
+    model.sim <- lm(fmla, data = data)
+    coef.list[[b]] <- model.sim$coefficients
+    var.list[[b]] <- sandwich::sandwich(model.sim) # Sandwich variances for the examples
+    data.list[[b]] <- data
+  }
+  return(list("coef" = coef.list, "var" = var.list, "data" = data.list))
+}
+
+
 
 ARDSBMSpilloverLinearRegressionSim <- function(Y,fmla, graphMapping, A, P, Z, B.boot = 200, verbose = F){
   n = length(Y)
@@ -425,9 +500,90 @@ optimalDesignSpilloverSBMGreedy <- function(phi,graphMapping,P,Z,grid.steps = 10
 }
 
 
+# Helper function to clean the graph data
+clean_diffusion_graphs <- function(graphs){
+  views = length(graphs)
+  G = NULL
+  for (view in seq(views)){
+    if( is.null(G) ) {
+      G = as.matrix(graphs[view][[1]][[1]])
+    }
+
+    else {
+      if(! is.null(graphs[view][[1]][[1]])){
+        G = G + as.matrix(graphs[view][[1]][[1]])
+      }
+    }
+  }
+  colnames(G) = NULL
+  rownames(G) = NULL
+  diag(G) = 0 # Remove self edges from the noisy sample
+  G <- G + t(G)
+  G[G > 0] = 1
+  G.true <- G
+  idx = which(colSums(G.true) > 0)
+  G.true = G.true[idx,idx]
+  return(G.true)
+}
 
 
 
+assign_balls_to_bins <- function(N, bin_sizes, decreasing = TRUE) {
+  # Sort bin sizes from largest to smallest
+  sorted_bin_sizes <- sort(bin_sizes, decreasing = decreasing)
 
+  bin_order = order(bin_sizes, decreasing = decreasing)
+  # Initialize vector to store number of balls in each bin
+  balls_in_bins <- rep(0, length(bin_sizes))
+
+  remaining_balls = N
+  k = 1
+  while(remaining_balls > 0){
+    bin_index = bin_order[k]
+    open_space = bin_sizes[bin_index]
+    if(open_space <= remaining_balls) {
+      balls_in_bins[bin_index] = bin_sizes[bin_index] # we fill the bin
+    } else {
+      balls_in_bins[bin_index] = remaining_balls # we place the remaining balls
+    }
+    remaining_balls = remaining_balls - balls_in_bins[bin_index]
+    k = k + 1
+  }
+  return(balls_in_bins)
+}
+
+
+
+cluster_leiden_K <- function(G, K = 4, adj_mode = "undirected", max_resolution_parameter = 10, n_iterations = 5){
+  g <- graph_from_adjacency_matrix(G, mode = adj_mode)
+  tmp_cluster = cluster_leiden(g, objective_function = "modularity",
+                               n_iterations = n_iterations, resolution_parameter = max_resolution_parameter)
+  resolution_parameter_upper = max_resolution_parameter
+  resolution_parameter_lower = 0
+  iter = 0
+  if(tmp_cluster$nb_clusters == K){
+    return(tmp$membership) # we are done
+  }
+  if(tmp_cluster$nb_clusters <  K) {
+    stop("Not enough clusters")
+  } else {
+    while(tmp_cluster$nb_clusters != K){
+      iter = iter + 1
+      resolution_parameter_tmp = (resolution_parameter_upper + resolution_parameter_lower)/2
+      tmp_cluster = cluster_leiden(g, objective_function = "modularity",
+                                   n_iterations = n_iterations, resolution_parameter = resolution_parameter_tmp)
+      if(tmp_cluster$nb_clusters > K){
+        resolution_parameter_upper = resolution_parameter_tmp
+      } else {
+        resolution_parameter_lower = resolution_parameter_tmp
+      }
+      if( iter > 100){
+        stop("Too many iterations")
+      }
+
+    }
+    return(tmp_cluster$membership)
+  }
+}
 
 
